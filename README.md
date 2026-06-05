@@ -2,7 +2,7 @@
 
 Android Firmware Toolkit is a lightweight Termux-friendly toolkit for extracting modern Android firmware images on-device.
 
-Version: `v2.1`
+Version: `v2.1.1`
 
 ## Overview
 
@@ -122,7 +122,7 @@ python main.py
 
 - The toolkit copies helper binaries from `bin/` into the home directory at runtime.
 - Some images are treated as EROFS partitions and others as EXT4 partitions based on filename rules in `main.py`.
-- Make sure you trust the source of any firmware image before extracting or executing any bundled binary.
+- Make sure you trust the source of any firmware image before extracting or executing any helper binary.
 
 ## License
 
