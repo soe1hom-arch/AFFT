@@ -103,4 +103,6 @@ python main.py
 
 ## License
 
-No explicit license file is included in this archive. Add one before publishing publicly on GitHub if you want a clear reuse policy.
+The original project files in this repository are licensed under the MIT License.
+
+See [`LICENSE`](LICENSE) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for details about bundled helper binaries and redistribution notes.
