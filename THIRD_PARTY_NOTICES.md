@@ -1,10 +1,11 @@
 # Third-Party Notices
 
-This repository includes bundled helper binaries under `bin/`.
+This source-only repository does not include bundled helper binaries under
+`bin/`.
 
-Those binaries are not covered by the license in `LICENSE` unless their
-upstream licenses explicitly allow it. Each bundled tool remains subject to
-its own upstream license and copyright terms.
+If you distribute a separate binary package, those binaries are not covered by
+the license in `LICENSE` unless their upstream licenses explicitly allow it.
+Each tool remains subject to its own upstream license and copyright terms.
 
 Bundled tools:
 
@@ -14,6 +15,6 @@ Bundled tools:
 - `extract.erofs`
 - `debugfs`
 
-Before redistributing this repository publicly, verify the redistribution terms
-for each bundled binary and add the corresponding upstream license notices if
+Before redistributing any separate binary package, verify the redistribution
+terms for each tool and add the corresponding upstream license notices if
 required.

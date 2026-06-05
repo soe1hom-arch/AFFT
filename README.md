@@ -52,17 +52,22 @@ AFT_TOLLS/
 ├── logs/
 ```
 
-## Included Binaries
+## Binary Policy
 
-The following tools are bundled in `bin/` for convenience:
+This repository is intentionally source-only.
+
+The helper binaries previously bundled with the toolkit are not tracked in the
+repository anymore to keep redistribution safer from a licensing perspective.
+If you build your own package, add the compatible helper binaries to `bin/`
+before running the script.
+
+Expected helper filenames:
 
 - `payload-dumper-go`
 - `lpunpack`
 - `simg2img`
 - `extract.erofs`
 - `debugfs`
-
-These binaries are included to support Android firmware extraction workflows. Each tool belongs to its respective upstream project.
 
 ## Usage
 
@@ -75,6 +80,24 @@ python main.py
 
 3. Select the extraction mode from the menu.
 4. Check the extracted files inside the `output/` folder.
+
+## Quick Start For Beginners
+
+If you do not want to set up the project manually, use the latest GitHub Release source package and add the helper binaries separately.
+
+1. Download the latest source release ZIP.
+2. Extract it on your device.
+3. Open Termux in the extracted folder.
+4. Run:
+
+```bash
+pkg update -y
+pkg install python -y
+termux-setup-storage
+python main.py
+```
+
+5. Place the required helper binaries in `bin/` if they are not already present.
 
 ## Supported Input Types
 
@@ -93,11 +116,11 @@ python main.py
 
 - Developer: `soe1hom-arch / Wandi`
 - Toolkit concept and workflow: `Android Firmware Toolkit`
-- Bundled binaries: respective upstream authors and projects
+- Helper binaries: respective upstream authors and projects
 
 ## Notes
 
-- The toolkit copies its helper binaries into the home directory at runtime.
+- The toolkit copies helper binaries from `bin/` into the home directory at runtime.
 - Some images are treated as EROFS partitions and others as EXT4 partitions based on filename rules in `main.py`.
 - Make sure you trust the source of any firmware image before extracting or executing any bundled binary.
 
@@ -105,4 +128,4 @@ python main.py
 
 The original project files in this repository are licensed under the MIT License.
 
-See [`LICENSE`](LICENSE) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for details about bundled helper binaries and redistribution notes.
+See [`LICENSE`](LICENSE) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for details about helper-binary redistribution notes.

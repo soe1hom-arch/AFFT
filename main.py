@@ -93,6 +93,14 @@ for name, source in BINARIES.items():
         print(f"{RED}[✗] Failed install {name}{RESET}")
         print(e)
 
+if len(INSTALLED_BIN) == 0:
+    print(
+        f"{YELLOW}[!] Source-only build detected: helper binaries are not bundled in this repository.{RESET}"
+    )
+    print(
+        f"{YELLOW}[!] Place compatible binaries in the 'bin/' folder before running extraction tasks.{RESET}\n"
+    )
+
 # =========================================================
 # CLEAN OUTPUT
 # =========================================================
