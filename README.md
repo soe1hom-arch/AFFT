@@ -99,6 +99,16 @@ python main.py
 
 5. Place the required helper binaries in `bin/` if they are not already present.
 
+### One-line Termux Installer
+
+If you want the full package instead of the source-only repo, run:
+
+```bash
+pkg update -y && pkg install -y curl && bash <(curl -fsSL https://raw.githubusercontent.com/soe1hom-arch/android-firmware-toolkit/main/install-termux.sh)
+```
+
+This installs the latest full package into `~/android-firmware-toolkit/AFT_TOLLS`.
+
 ## Supported Input Types
 
 - `payload.bin`
