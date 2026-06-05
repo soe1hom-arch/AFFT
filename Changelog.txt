@@ -1,0 +1,75 @@
+==============================================
+LATEST UPDATE (v2.1) - WHAT'S NEW?
+
+✓ Fixed Sparse Super.img Extraction
+Memperbaiki masalah dimana lpunpack gagal
+mengekstrak super.img bertipe Sparse Image.
+
+✓ Automatic Sparse Conversion
+Toolkit sekarang otomatis mendeteksi Sparse
+super.img dan mengkonversinya ke Raw Image
+menggunakan simg2img sebelum proses unpack.
+
+✓ Improved Super.img Engine
+Menu 2 sekarang mendukung:
+
+super.img (Sparse)
+↓
+simg2img
+↓
+Raw super.img
+↓
+lpunpack
+↓
+system.img
+vendor.img
+product.img
+dll
+
+tanpa perlu menjalankan command manual.
+
+✓ Extraction Validation
+Menambahkan validasi hasil ekstraksi.
+Program tidak lagi menampilkan status sukses
+palsu ketika proses unpack gagal.
+
+✓ Better Error Handling
+Penanganan error untuk super.img dan proses
+unpack dibuat lebih stabil.
+
+✓ Improved HyperOS Compatibility
+Kompatibilitas lebih baik untuk Fastboot ROM
+HyperOS dan Android 15.
+
+==============================================
+PREVIOUS UPDATE (v2.0)
+
+✓ HyperOS Compatibility Engine
+
+✓ Continuous Menu System (Anti-Keluar)
+
+✓ Updated Binaries Engine
+
+==============================================
+VERSION HISTORY
+
+v2.1
+
+- Fixed Sparse Super.img Support
+- Added Automatic simg2img Conversion
+- Added Extraction Validation
+- Improved lpunpack Workflow
+- Improved HyperOS Fastboot Compatibility
+
+v2.0
+
+- HyperOS Compatibility Engine
+- Continuous Menu Loop
+- Updated Binaries Engine
+
+v1.x
+
+- Initial Release
+- Payload.bin Extraction
+- Super.img Extraction
+- EROFS & EXT4 Support
