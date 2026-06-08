@@ -94,7 +94,7 @@ python main.py
 
 ### Otomatis (via install-termux.sh):
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/soe1hom-arch/AFFT/main/install-termux.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/soe1hom-arch/AFFT/main/install-termux.sh)
 ```
 
 ### Manual:
