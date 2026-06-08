@@ -2,366 +2,589 @@ import os
 import shutil
 import subprocess
 import time
+import threading
+from pathlib import Path
 
-# =========================================================
-# PATH
-# =========================================================
+from modules.boot import (
+    boot_family_status,
+    repack_boot,
+    repack_init_boot,
+    repack_vendor_boot,
+    unpack_boot,
+    unpack_init_boot,
+    unpack_vendor_boot,
+)
+from modules.common import INPUT_DIR, OUTPUT_DIR, TEMP_DIR, ensure_workspace, resolve_binary
+from modules.super import repack_super, unpack_super, unpack_super_with_contents
 
-HOME = os.path.expanduser("~")
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-BIN_DIR = os.path.join(BASE_DIR, "bin")
-INPUT_DIR = os.path.join(BASE_DIR, "input")
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-TEMP_DIR = os.path.join(BASE_DIR, "temp")
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
 
 # =========================================================
 # COLORS
 # =========================================================
 
-RED = "\033[91m"
-GREEN = "\033[92m"
+RED    = "\033[91m"
+GREEN  = "\033[92m"
 YELLOW = "\033[93m"
-CYAN = "\033[96m"
-RESET = "\033[0m"
+CYAN   = "\033[96m"
+RESET  = "\033[0m"
 
 # =========================================================
-# CREATE FOLDERS
+# BANNER
 # =========================================================
 
-os.makedirs(INPUT_DIR, exist_ok=True)
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(TEMP_DIR, exist_ok=True)
-os.makedirs(LOGS_DIR, exist_ok=True)
+APP_VERSION = "2.0"
 
-# =========================================================
-# =========================================================
-# BINARIES (Hanya yang dipakai saja)
-# =========================================================
 
-BINARIES = {
-    "payload-dumper-go": os.path.join(BIN_DIR, "payload-dumper-go"),
-    "lpunpack":          os.path.join(BIN_DIR, "lpunpack"),
-    "simg2img":          os.path.join(BIN_DIR, "simg2img"),
-    "extract.erofs":     os.path.join(BIN_DIR, "extract.erofs"),
-    "debugfs":           os.path.join(BIN_DIR, "debugfs"),
-}
+def show_header():
+    """Tampilkan header sederhana untuk submenu."""
+    print(f"{GREEN}=============================={RESET}")
+    print(f"{CYAN}   ANDROID FIRMWARE TOOLKIT{RESET}")
+    print(f"{YELLOW}   AFFT v{APP_VERSION} — By. soe1hom-arch / Wandi{RESET}")
+    print(f"{GREEN}=============================={RESET}")
 
-INSTALLED_BIN = {}
 
-# =========================================================
-# HEADER
-# =========================================================
-
-print(f"""
-{CYAN}
-╔══════════════════════════════════════════════╗
-║         ANDROID FIRMWARE TOOLKIT            ║
-║        By. soe1hom-arch / Wandi             ║
-╚══════════════════════════════════════════════╝
-{RESET}
+def show_banner():
+    """Tampilkan banner utama (hanya di menu utama)."""
+    print(f"""
+{GREEN}╔══════════════════════════════════════════════╗
+║        {CYAN}ANDROID FIRMWARE TOOLKIT{RESET}{GREEN}           ║
+║        {CYAN}AFFT v{APP_VERSION}{RESET}{GREEN}                       ║
+║        {YELLOW}By. soe1hom-arch / Wandi{RESET}{GREEN}         ║
+╚══════════════════════════════════════════════╝{RESET}
 """)
 
+
 # =========================================================
-# INSTALL BINARIES
+# PREPARE WORKSPACE & BINARIES
 # =========================================================
+
+ensure_workspace()
+show_banner()
 
 print(f"{YELLOW}[•] Preparing binaries...{RESET}\n")
 
-for name, source in BINARIES.items():
-    target = os.path.join(HOME, name)
-    if not os.path.exists(source):
-        print(f"{YELLOW}[!] Missing binary: {name}{RESET}")
+# Mengikuti pola main.py asli: copy dari bin/ ke HOME/, chmod +x
+from modules.common import binary_path, RUNTIME_BIN_DIR, shutil, subprocess
+
+BINARY_NAMES = [
+    "payload-dumper-go",
+    "lpunpack",
+    "lpmake",
+    "simg2img",
+    "extract.erofs",
+    "debugfs",
+    "magiskboot",
+    "mkfs.erofs",
+    "make_ext4fs",
+]
+
+# Cek PATH dulu (binary system / pkg install)
+for name in BINARY_NAMES:
+    sysbin = shutil.which(name)
+    if sysbin:
+        print(f"{GREEN}[✓] {name} ready (system){RESET}")
         continue
 
-    try:
-        if os.path.exists(target):
-            try:
-                os.remove(target)
-            except:
-                pass
-
-        shutil.copy2(source, target)
-        subprocess.run(
-            ["chmod", "+x", target],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        INSTALLED_BIN[name] = target
-        print(f"{GREEN}[✓] {name} ready{RESET}")
-    except Exception as e:
-        print(f"{RED}[✗] Failed install {name}{RESET}")
-        print(e)
-
-if len(INSTALLED_BIN) == 0:
-    print(
-        f"{YELLOW}[!] Source-only build detected: helper binaries are not bundled in this repository.{RESET}"
-    )
-    print(
-        f"{YELLOW}[!] Place compatible binaries in the 'bin/' folder before running extraction tasks.{RESET}\n"
-    )
+    # Copy dari bin/ ke HOME/ (pola asli main.py)
+    source = binary_path(name)
+    target = RUNTIME_BIN_DIR / name
+    if source.exists():
+        try:
+            if target.exists():
+                target.unlink()
+            shutil.copy2(source, target)
+            subprocess.run(["chmod", "+x", str(target)],
+                         capture_output=True, timeout=5)
+            print(f"{GREEN}[✓] {name} ready (from bin/){RESET}")
+        except Exception as e:
+            print(f"{YELLOW}[!] Gagal install {name}: {e}{RESET}")
+    else:
+        print(f"{YELLOW}[!] Missing binary: {name}{RESET}")
 
 # =========================================================
-# CLEAN OUTPUT
+# ANIMATED PROGRESS
 # =========================================================
 
-def clean_output():
-    for folder in [OUTPUT_DIR, TEMP_DIR]:
-        if os.path.exists(folder):
-            for item in os.listdir(folder):
-                path = os.path.join(folder, item)
-                try:
-                    if os.path.isfile(path):
-                        os.remove(path)
-                    else:
-                        shutil.rmtree(path)
-                except:
-                    pass
-
-# =========================================================
-# CHECK SPARSE
-# =========================================================
-
-def is_sparse(path):
-    try:
-        with open(path, "rb") as f:
-            magic = f.read(4)
-        return magic == b'\x3A\xFF\x26\xED'
-    except:
-        return False
-
-# =========================================================
-# PROGRESS ANIMATION
-# =========================================================
 
 def animated_progress(process, text):
     spinner = ["|", "/", "-", "\\"]
     i = 0
     percent = 0
-
     while process.poll() is None:
         if percent < 95:
             percent += 1
         print(f"\r{CYAN}[{percent}%] [{spinner[i % 4]}] {text}{RESET}", end="", flush=True)
         i += 1
         time.sleep(0.2)
-        
     print(f"\r{GREEN}[100%] [✓] {text}{RESET}                    ")
 
+
+def run_with_progress(text: str, fn):
+    """Jalankan fungsi modules di thread terpisah sambil tampilkan spinner."""
+    result_box = [None]
+    spinner = ["|", "/", "-", "\\"]
+    done = threading.Event()
+
+    def worker():
+        result_box[0] = fn()
+        done.set()
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
+
+    i = 0
+    percent = 0
+    while not done.is_set():
+        if percent < 95:
+            percent += 1
+        print(f"\r{CYAN}[{percent}%] [{spinner[i % 4]}] {text}{RESET}", end="", flush=True)
+        i += 1
+        time.sleep(0.2)
+
+    t.join()
+    result = result_box[0]
+    if result.ok:
+        print(f"\r{GREEN}[100%] [✓] {text}{RESET}                    ")
+    else:
+        print(f"\r{RED}[  0%] [✗] {text}{RESET}                    ")
+    return result
+
+
+def print_result(result):
+    if result.ok:
+        print(f"\n{GREEN}[✓] {result.title}: {result.message}{RESET}")
+    else:
+        print(f"\n{RED}[✗] {result.title}: {result.message}{RESET}")
+    if result.output_path:
+        print(f"Output : {result.output_path}")
+
 # =========================================================
-# LOOP UTAMA TOOLS
+# CHOOSE IMAGE HELPER
+# =========================================================
+
+
+def choose_image(prompt: str, predicate=None) -> Path | None:
+    candidates = sorted(
+        [p for p in INPUT_DIR.iterdir() if p.is_file() and (predicate(p) if predicate else True)]
+    )
+    if not candidates:
+        print(f"\n{RED}[✗] Tidak ada file ditemukan di input/{RESET}")
+        return None
+
+    print(f"\n{CYAN}{prompt}{RESET}\n")
+    for index, item in enumerate(candidates, start=1):
+        size_mb = item.stat().st_size / (1024 * 1024)
+        print(f"[{index}] {item.name}  ({size_mb:.1f} MB)")
+
+    try:
+        choice = int(input("\nSelect file : ").strip())
+        if 1 <= choice <= len(candidates):
+            return candidates[choice - 1]
+        print(f"{RED}[✗] Pilihan di luar jangkauan.{RESET}")
+        return None
+    except Exception:
+        print(f"{RED}[✗] Input tidak valid.{RESET}")
+        return None
+
+
+def is_boot_candidate(path: Path) -> bool:
+    return path.name.lower() == "boot.img"
+
+
+def is_vendor_boot_candidate(path: Path) -> bool:
+    return path.name.lower() == "vendor_boot.img"
+
+
+def is_init_boot_candidate(path: Path) -> bool:
+    return path.name.lower() == "init_boot.img"
+
+
+def is_super_candidate(path: Path) -> bool:
+    return path.name.lower() == "super.img"
+
+
+# =========================================================
+# MENU 1: PAYLOAD.BIN
+# =========================================================
+
+def menu_payload():
+    show_header()
+    payload_file = INPUT_DIR / "payload.bin"
+
+    if not payload_file.exists():
+        print(f"\n{RED}[✗] payload.bin not found in 'input' folder!{RESET}")
+        input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        return
+
+    tool = resolve_binary("payload-dumper-go")
+    if tool is None:
+        print(f"\n{RED}[✗] payload-dumper-go not found in bin/{RESET}")
+        input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        return
+
+    print(f"\n{GREEN}[✓] payload.bin detected{RESET}")
+    process = subprocess.Popen(
+        [str(tool), "-o", str(OUTPUT_DIR), str(payload_file)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    animated_progress(process, "Extracting payload.bin...")
+    print(f"Output : {OUTPUT_DIR}")
+    input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+
+
+# =========================================================
+# MENU 2: SUPER.IMG
+# =========================================================
+
+def menu_super():
+    show_header()
+    while True:
+        print(f"""
+{CYAN}[1]{RESET} Unpack super.img only
+{CYAN}[2]{RESET} Unpack super.img + extract filesystem
+{CYAN}[3]{RESET} Repack super.img only
+{CYAN}[4]{RESET} Repack super.img + filesystem
+{CYAN}[5]{RESET} Back
+""")
+        choice = input("Select Menu : ").strip()
+
+        if choice == "1":
+            image = choose_image("Choose super image:", is_super_candidate)
+            if image:
+                print(f"\n{GREEN}[✓] super.img detected ({image.stat().st_size / (1024**2):.1f} MB){RESET}")
+                result = run_with_progress("Unpacking super.img...", lambda: unpack_super(image))
+                print_result(result)
+                if result.ok:
+                    out = Path(result.output_path)
+                    imgs = sorted([f.name for f in out.iterdir()
+                                   if f.is_file() and f.suffix == ".img"
+                                   and f.name not in {"super.img", "super_raw.img"}])
+                    if imgs:
+                        print(f"\n{GREEN}[✓] Extracted {len(imgs)} partitions:{RESET}")
+                        for name in imgs:
+                            print(f"  \u2022 {name}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+
+        elif choice == "2":
+            image = choose_image("Choose super image:", is_super_candidate)
+            if image:
+                print(f"\n{GREEN}[✓] super.img detected ({image.stat().st_size / (1024**2):.1f} MB){RESET}")
+
+                print(f"\n{YELLOW}[•] Step 1/2 — Unpacking super.img{RESET}")
+                base_result = run_with_progress("Unpacking super.img...", lambda: unpack_super(image))
+                if not base_result.ok:
+                    print_result(base_result)
+                    input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                    continue
+
+                out = Path(base_result.output_path)
+                imgs = sorted([f for f in out.iterdir() if f.is_file() and f.suffix == ".img"
+                               and f.name not in {"super.img", "super_raw.img"}])
+                print(f"{GREEN}[✓] Found {len(imgs)} partitions: {', '.join(f.name for f in imgs)}{RESET}")
+
+                print(f"\n{YELLOW}[•] Step 2/2 — Extracting filesystem{RESET}")
+                from modules.filesystem import unpack_filesystem
+                contents_dir = out / "contents"
+                contents_dir.mkdir(parents=True, exist_ok=True)
+
+                ok_count = 0
+                fail_count = 0
+                for img in imgs:
+                    fs_result = run_with_progress(
+                        f"Extracting {img.name}...",
+                        lambda i=img: unpack_filesystem(i, output_base=contents_dir)
+                    )
+                    if fs_result.ok:
+                        ok_count += 1
+                    else:
+                        fail_count += 1
+                        print(f"  {RED}\u2192 {img.name}: {fs_result.message}{RESET}")
+
+                print(f"\n{GREEN}[✓] Done! {ok_count} success{RESET}" +
+                      (f", {RED}{fail_count} failed{RESET}" if fail_count else ""))
+                print(f"Output : {out}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+
+        elif choice == "3":
+            result = run_with_progress("Repacking super.img...", repack_super)
+            print_result(result)
+            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+
+        elif choice == "4":
+            # Repack super.img + filesystem (reverse dari option 2)
+            filesystem_dir = OUTPUT_DIR / "super" / "contents"
+            super_img_dir = OUTPUT_DIR / "super"
+
+            if not filesystem_dir.exists() or not any(filesystem_dir.iterdir()):
+                print(f"\n{RED}[✗] Tidak ada filesystem contents ditemukan.{RESET}")
+                print(f"{YELLOW}  Unpack super.img + extract filesystem dulu (menu [2] \u2192 [2]).{RESET}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                continue
+
+            if not super_img_dir.exists():
+                print(f"\n{RED}[✗] No partition images found in output/super/!{RESET}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                continue
+
+            # Step 1/2: Repack filesystem contents -> .img
+            print(f"\n{YELLOW}[•] Step 1/2 — Repacking filesystem contents into images{RESET}")
+            from modules.filesystem import repack_filesystem
+
+            ok_count = 0
+            for item in sorted(filesystem_dir.iterdir()):
+                if not item.is_dir():
+                    continue
+                img_name = item.name + ".img"
+                src_img = super_img_dir / img_name
+                if not src_img.exists():
+                    continue
+
+                temp_img = TEMP_DIR / "repacking" / img_name
+                temp_img.parent.mkdir(parents=True, exist_ok=True)
+                fs_result = repack_filesystem(item, output_img=temp_img)
+                if fs_result.ok:
+                    shutil.copy2(temp_img, src_img)
+                    temp_img.unlink(missing_ok=True)
+                    ok_count += 1
+                else:
+                    print(f"  {RED}\u2192 {img_name} gagal: {fs_result.message}{RESET}")
+                temp_img.unlink(missing_ok=True)
+
+            if ok_count > 0:
+                print(f"  {GREEN}[✓] {ok_count} filesystem berhasil direpack{RESET}")
+            else:
+                print(f"{RED}[✗] Semua filesystem gagal direpack, abort.{RESET}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                continue
+
+            # Step 2/2: Repack super.img
+            print(f"\n{YELLOW}[•] Step 2/2 — Repacking super.img{RESET}")
+            result2 = run_with_progress("Repacking super.img...", repack_super)
+            print_result(result2)
+            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+
+        elif choice == "5":
+            break
+        else:
+            print(f"\n{RED}[✗] Invalid menu{RESET}")
+            input(f"\n{YELLOW}Press Enter to try again...{RESET}")
+
+
+# =========================================================
+# MENU 3: FILESYSTEM IMG
+# =========================================================
+
+def menu_filesystem():
+    show_header()
+    while True:
+        print(f"""
+{CYAN}[1]{RESET} Extract filesystem IMG (from input/)
+{CYAN}[2]{RESET} Repack filesystem IMG (from temp/filesystem/)
+{CYAN}[3]{RESET} Back
+""")
+        choice = input("Select Menu : ").strip()
+
+        if choice == "1":
+            from modules.filesystem import unpack_filesystem
+            candidates = sorted(
+                [p for p in INPUT_DIR.iterdir()
+                 if p.is_file() and p.suffix.lower() == ".img"
+                 and p.name not in ("super.img", "payload.bin")]
+            )
+            if not candidates:
+                print(f"\n{RED}[✗] No filesystem IMG found in 'input' folder!{RESET}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                continue
+
+            print(f"\n{CYAN}Choose filesystem image:{RESET}\n")
+            for idx, img in enumerate(candidates, 1):
+                size_mb = img.stat().st_size / (1024 * 1024)
+                print(f"[{idx}] {img.name}  ({size_mb:.1f} MB)")
+
+            try:
+                sel = int(input("\nSelect file : ").strip())
+                if 1 <= sel <= len(candidates):
+                    chosen = candidates[sel - 1]
+                else:
+                    print(f"{RED}[✗] Pilihan di luar jangkauan.{RESET}")
+                    input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                    continue
+            except Exception:
+                print(f"{RED}[✗] Input tidak valid.{RESET}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                continue
+
+            result = run_with_progress(
+                f"Extracting {chosen.name}...",
+                lambda: unpack_filesystem(chosen)
+            )
+            print_result(result)
+            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+
+        elif choice == "2":
+            from modules.filesystem import repack_filesystem
+            fs_root = TEMP_DIR / "filesystem"
+            if not fs_root.exists():
+                print(f"\n{RED}[✗] Folder temp/filesystem/ tidak ditemukan!{RESET}")
+                print(f"{YELLOW}  Extract filesystem terlebih dahulu (menu [2] \u2192 [2] atau menu [3] \u2192 [1]).{RESET}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                continue
+
+            folders = sorted([d for d in fs_root.iterdir() if d.is_dir()])
+            if not folders:
+                print(f"\n{RED}[✗] Tidak ada folder hasil extract di temp/filesystem/!{RESET}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                continue
+
+            print(f"\n{CYAN}Choose folder to repack:{RESET}\n")
+            for idx, folder in enumerate(folders, 1):
+                size_mb = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file()) / (1024 * 1024)
+                print(f"[{idx}] {folder.name}  ({size_mb:.1f} MB)")
+
+            try:
+                sel = int(input("\nSelect folder : ").strip())
+                if 1 <= sel <= len(folders):
+                    target_folder = folders[sel - 1]
+                else:
+                    print(f"{RED}[✗] Pilihan di luar jangkauan.{RESET}")
+                    input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                    continue
+            except Exception:
+                print(f"{RED}[✗] Input tidak valid.{RESET}")
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                continue
+
+            print(f"\n{GREEN}[✓] Selected : {target_folder.name}{RESET}")
+
+            out_dir = OUTPUT_DIR / "repacked" / "filesystem"
+            out_img = out_dir / f"{target_folder.name}.img"
+
+            result = run_with_progress(
+                f"Repacking {target_folder.name}...",
+                lambda: repack_filesystem(target_folder, output_img=out_img)
+            )
+            print_result(result)
+            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+
+        elif choice == "3":
+            break
+        else:
+            print(f"\n{RED}[✗] Invalid menu{RESET}")
+            input(f"\n{YELLOW}Press Enter to try again...{RESET}")
+
+
+# =========================================================
+# MENU 4: BOOT FAMILY
+# =========================================================
+
+def menu_boot():
+    show_header()
+    while True:
+        print(f"""
+{CYAN}[1]{RESET} Check boot family
+{CYAN}[2]{RESET} Unpack boot.img
+{CYAN}[3]{RESET} Unpack vendor_boot.img
+{CYAN}[4]{RESET} Unpack init_boot.img
+{CYAN}[5]{RESET} Repack boot.img
+{CYAN}[6]{RESET} Repack vendor_boot.img
+{CYAN}[7]{RESET} Repack init_boot.img
+{CYAN}[8]{RESET} Back
+""")
+        choice = input("Select Menu : ").strip()
+
+        if choice == "1":
+            from modules.boot import boot_family_status
+            result = boot_family_status(INPUT_DIR)
+            print_result(result)
+            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        elif choice == "2":
+            image = choose_image("Choose boot image:", is_boot_candidate)
+            if image:
+                result = run_with_progress("Unpacking boot.img...", lambda: unpack_boot(image))
+                print_result(result)
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        elif choice == "3":
+            image = choose_image("Choose vendor_boot image:", is_vendor_boot_candidate)
+            if image:
+                result = run_with_progress("Unpacking vendor_boot.img...", lambda: unpack_vendor_boot(image))
+                print_result(result)
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        elif choice == "4":
+            image = choose_image("Choose init_boot image:", is_init_boot_candidate)
+            if image:
+                result = run_with_progress("Unpacking init_boot.img...", lambda: unpack_init_boot(image))
+                print_result(result)
+                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        elif choice == "5":
+            result = run_with_progress("Repacking boot.img...", repack_boot)
+            print_result(result)
+            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        elif choice == "6":
+            result = run_with_progress("Repacking vendor_boot.img...", repack_vendor_boot)
+            print_result(result)
+            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        elif choice == "7":
+            result = run_with_progress("Repacking init_boot.img...", repack_init_boot)
+            print_result(result)
+            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+        elif choice == "8":
+            break
+        else:
+            print(f"\n{RED}[✗] Invalid menu{RESET}")
+            input(f"\n{YELLOW}Press Enter to try again...{RESET}")
+
+
+# =========================================================
+# MENU 5: CLEAN OUTPUT
+# =========================================================
+
+def menu_clean():
+    show_header()
+    for folder in [OUTPUT_DIR, TEMP_DIR]:
+        if folder.exists():
+            for item in folder.iterdir():
+                try:
+                    if item.is_file():
+                        item.unlink()
+                    else:
+                        shutil.rmtree(item)
+                except Exception:
+                    pass
+    print(f"\n{GREEN}[✓] Output cleaned{RESET}")
+    input(f"\n{YELLOW}Press Enter to continue...{RESET}")
+
+
+# =========================================================
+# MAIN LOOP
 # =========================================================
 
 while True:
+    show_banner()
     print(f"""
 {CYAN}[1]{RESET} Extract payload.bin
 {CYAN}[2]{RESET} Unpack super.img
 {CYAN}[3]{RESET} Extract filesystem IMG
-{CYAN}[4]{RESET} Clean output
-{CYAN}[5]{RESET} Exit
+{CYAN}[4]{RESET} Boot family (unpack/repack)
+{CYAN}[5]{RESET} Clean output
+{CYAN}[6]{RESET} Exit
 """)
 
-    choice = input("Select Menu : ")
+    choice = input("Select Menu : ").strip()
 
-    # =========================================================
-    # MENU 4: CLEAN OUTPUT
-    # =========================================================
-    if choice == "4":
-        clean_output()
-        print(f"\n{GREEN}[✓] Output cleaned{RESET}")
-        input(f"\n{YELLOW}Press Enter to continue...{RESET}")
-
-    # =========================================================
-    # MENU 5: EXIT
-    # =========================================================
-    elif choice == "5":
-        print(f"\n{CYAN}Thank you for using this tool!{RESET}")
-        break  # Keluar dari loop while, otomatis menutup script
-
-    # =========================================================
-    # MENU 1: PAYLOAD.BIN
-    # =========================================================
-    elif choice == "1":
-        payload_file = os.path.join(INPUT_DIR, "payload.bin")
-
-        if not os.path.exists(payload_file):
-            print(f"\n{RED}[✗] payload.bin not found in 'input' folder!{RESET}")
-            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-            continue # Kembali ke awal menu tanpa menutup program
-
-        print(f"\n{GREEN}[✓] payload.bin detected{RESET}")
-        process = subprocess.Popen(
-            [INSTALLED_BIN["payload-dumper-go"], "-o", OUTPUT_DIR, payload_file],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        animated_progress(process, "Extracting payload.bin...")
-        print(f"Output : {OUTPUT_DIR}")
-        input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-
-    # =========================================================
-    # MENU 2: SUPER.IMG
-    # =========================================================
+    if choice == "1":
+        menu_payload()
     elif choice == "2":
-        super_file = os.path.join(INPUT_DIR, "super.img")
-
-        if not os.path.exists(super_file):
-            print(f"\n{RED}[✗] super.img not found in 'input' folder!{RESET}")
-            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-            continue
-
-        print(f"\n{GREEN}[✓] super.img detected{RESET}")
-
-        if is_sparse(super_file):
-            print(f"{YELLOW}[*] Sparse super.img detected{RESET}")
-
-            raw_super = os.path.join(
-                TEMP_DIR,
-                "super_raw.img"
-            )
-
-            convert = subprocess.run(
-                [
-                    INSTALLED_BIN["simg2img"],
-                    super_file,
-                    raw_super
-                ],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-
-            if convert.returncode != 0:
-                print(f"\n{RED}[✗] Failed converting super.img{RESET}")
-                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-                continue
-
-            super_file = raw_super
-            print(f"{GREEN}[✓] Converted to raw super.img{RESET}")
-
-        process = subprocess.Popen(
-            [
-                INSTALLED_BIN["lpunpack"],
-                super_file,
-                OUTPUT_DIR
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-
-        animated_progress(process, "Unpacking super.img...")
-        process.wait()
-
-        extracted = [
-            f for f in os.listdir(OUTPUT_DIR)
-            if f.endswith(".img")
-        ]
-
-        if len(extracted) == 0:
-            print(f"\n{RED}[✗] No partition extracted{RESET}")
-        else:
-            print(f"\n{GREEN}[✓] Extracted {len(extracted)} partitions{RESET}")
-
-        try:
-            raw_super = os.path.join(TEMP_DIR, "super_raw.img")
-            if os.path.exists(raw_super):
-                os.remove(raw_super)
-        except:
-            pass
-
-        print(f"Output : {OUTPUT_DIR}")
-        input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-
-    # =========================================================
-    # MENU 3: FILESYSTEM IMG
-    # =========================================================
+        menu_super()
     elif choice == "3":
-        filesystem_keywords = ["system", "vendor", "product", "odm", "system_ext", "mi_ext", "vendor_dlkm", "system_dlkm", "cust"]
-        img_files = []
-
-        for file in os.listdir(INPUT_DIR):
-            if file.endswith(".img") and file != "super.img":
-                lower = file.lower()
-                for keyword in filesystem_keywords:
-                    if keyword in lower:
-                        img_files.append(file)
-                        break
-
-        if len(img_files) == 0:
-            print(f"\n{RED}[✗] No filesystem IMG found in 'input' folder!{RESET}")
-            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-            continue
-
-        print(f"\n{CYAN}Available Filesystem IMG:{RESET}\n")
-        for index, file in enumerate(img_files):
-            print(f"[{index + 1}] {file}")
-
-        try:
-            select = int(input("\nSelect IMG : "))
-            target_img = os.path.join(INPUT_DIR, img_files[select - 1])
-        except:
-            print(f"\n{RED}[✗] Invalid selection{RESET}")
-            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-            continue
-
-        img_name = os.path.basename(target_img).replace(".img", "")
-        img_output = os.path.join(OUTPUT_DIR, img_name)
-        os.makedirs(img_output, exist_ok=True)
-
-        print(f"\n{GREEN}[✓] Selected : {img_name}.img{RESET}")
-
-        # --- SPARSE CHECK ---
-        if is_sparse(target_img):
-            print(f"{YELLOW}[*] Sparse image detected{RESET}")
-            raw_img = os.path.join(TEMP_DIR, f"{img_name}_raw.img")
-            subprocess.run(
-                [INSTALLED_BIN["simg2img"], target_img, raw_img],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            target_img = raw_img
-            print(f"{GREEN}[✓] Sparse converted{RESET}")
-
-        # --- EROFS PARTITIONS CHECK ---
-        erofs_partitions = ["system", "system_ext", "system_dlkm", "vendor", "vendor_dlkm", "product", "mi_ext", "odm", "cust"]
-        force_erofs = False
-        for part in erofs_partitions:
-            if part in img_name.lower():
-                force_erofs = True
-                break
-
-        # --- EXTRACTION ---
-        if force_erofs:
-            print(f"{GREEN}[✓] Using EROFS extraction{RESET}")
-            process = subprocess.Popen(
-                [INSTALLED_BIN["extract.erofs"], "-i", target_img, "-x", "-o", img_output],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            animated_progress(process, f"Extracting {img_name}.img...")
-        else:
-            print(f"{GREEN}[✓] Using EXT4 extraction{RESET}")
-            ext4_output = os.path.join(img_output, "ext4_extract")
-            os.makedirs(ext4_output, exist_ok=True)
-            process = subprocess.Popen(
-                [INSTALLED_BIN["debugfs"], "-R", f"rdump / {ext4_output}", target_img],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
-            animated_progress(process, f"Extracting {img_name}.img...")
-
-        # --- CLEAN TEMP ---
-        for file in os.listdir(TEMP_DIR):
-            try:
-                os.remove(os.path.join(TEMP_DIR, file))
-            except:
-                pass
-
-        print(f"Output : {img_output}")
-        input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-
-    # =========================================================
-    # INVALID MENU
-    # =========================================================
+        menu_filesystem()
+    elif choice == "4":
+        menu_boot()
+    elif choice == "5":
+        menu_clean()
+    elif choice == "6":
+        print(f"\n{CYAN}Thank you for using this tool!{RESET}")
+        break
     else:
         print(f"\n{RED}[✗] Invalid menu{RESET}")
         input(f"\n{YELLOW}Press Enter to try again...{RESET}")

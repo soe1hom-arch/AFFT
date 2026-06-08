@@ -1,0 +1,47 @@
+CHANGELOG - Android Firmware Full Toolkit (AFFT)
+===========================================
+
+v2.1
+----
+
+- Fixed Sparse Super.img Support
+- Added Automatic simg2img Conversion
+- Added Extraction Validation
+- Improved lpunpack Workflow
+- Improved HyperOS Fastboot Compatibility
+
+v2.0 (2025-06-08)
+-----------------
+
+[+] Fitur Baru:
+    - Menu repack super.img (Submenu [2] → [3] dan [4])
+    - Menu repack filesystem satu per satu (Submenu [3] → [2])
+    - Filesystem extraction & repack mandiri tanpa super.img
+    - Modular code dengan modules/ (super.py, filesystem.py, boot.py, validate.py)
+    - Boot family (unpack/repack boot.img, vendor_boot.img, init_boot.img)
+    - Banner utama di menu, header sederhana di submenu
+
+[!] Perbaikan Bug:
+    - Fix "work_dir not defined" pada unpack_super_with_contents
+    - Fix misleading error message "temp/super/" jadi "output/super/"
+    - Fix UnboundLocalError: fs_kind dipakai sebelum diisi
+    - Fix SIGSYS pada simg2img/mkfs.erofs (ganti ke NDK build)
+    - Fix libuuid.so not found (LD_LIBRARY_PATH otomatis)
+
+[*] Peningkatan:
+    - Binary mkfs.erofs & extract.erofs: Android NDK static build (kompatibel 100%)
+    - Storage lebih hemat: temp/super/ dibersihkan otomatis
+    - Filter super.img & super_raw.img tidak ikut extract
+    - Binary opsional tidak wajib (mkfs.erofs, make_ext4fs, lpmake)
+    - Binary resolver otomatis: PATH > $HOME/ > bin/ lokal
+    - Format lpmake diperbaiki: --partition= dan --image= (fork custom)
+
+v1.0 (2025-05-25)
+-----------------
+
+[+] Rilis awal
+    - Extract payload.bin
+    - Unpack super.img
+    - Extract filesystem EROFS / ext4
+    - Boot family (unpack/repack)
+    - Clean output

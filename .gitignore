@@ -1,3 +1,9 @@
-bin/*
-!bin/README.md
-!bin/.gitkeep
+input/
+output/
+temp/
+logs/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+*.tmp
