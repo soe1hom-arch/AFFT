@@ -30,7 +30,7 @@ def _clear_dir(path: Path):
 def _copy_super_results(work_dir: Path, out_dir: Path):
     copied = []
     for item in work_dir.iterdir():
-        if item.is_file() and item.suffix.lower() == ".img":
+        if item.is_file() and item.suffix.lower() == ".img" and item.stat().st_size > 0:
             target = out_dir / item.name
             shutil.copy2(item, target)
             copied.append(item.name)
@@ -59,7 +59,8 @@ def _partition_images(scan_dir: Path):
     partitions = []
     for item in sorted(scan_dir.iterdir()):
         if item.is_file() and item.suffix.lower() == ".img" \
-           and item.name not in {"super.img", "super_raw.img"}:
+           and item.name not in {"super.img", "super_raw.img"} \
+           and item.stat().st_size > 0:
             partitions.append(item)
     return partitions
 
@@ -148,7 +149,8 @@ def unpack_super(image_path: Path) -> OperationResult:
         # Hapus image partisi dari temp/ supaya tidak duplikat (hemat storage)
         for item in list(work_dir.iterdir()):
             if item.is_file() and item.suffix.lower() == ".img" \
-               and item.name not in {"super.img", "super_raw.img"}:
+               and item.name not in {"super.img", "super_raw.img"} \
+           and item.stat().st_size > 0:
                 item.unlink()
 
         if not copied:

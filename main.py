@@ -259,7 +259,8 @@ def menu_super():
                     out = Path(result.output_path)
                     imgs = sorted([f.name for f in out.iterdir()
                                    if f.is_file() and f.suffix == ".img"
-                                   and f.name not in {"super.img", "super_raw.img"}])
+                                   and f.name not in {"super.img", "super_raw.img"} \
+                                   and f.stat().st_size > 0])
                     if imgs:
                         print(f"\n{GREEN}[✓] Extracted {len(imgs)} partitions:{RESET}")
                         for name in imgs:
@@ -280,7 +281,8 @@ def menu_super():
 
                 out = Path(base_result.output_path)
                 imgs = sorted([f for f in out.iterdir() if f.is_file() and f.suffix == ".img"
-                               and f.name not in {"super.img", "super_raw.img"}])
+                               and f.name not in {"super.img", "super_raw.img"} \
+                                   and f.stat().st_size > 0])
                 print(f"{GREEN}[✓] Found {len(imgs)} partitions: {', '.join(f.name for f in imgs)}{RESET}")
 
                 print(f"\n{YELLOW}[•] Step 2/2 — Extracting filesystem{RESET}")
