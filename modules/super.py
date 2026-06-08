@@ -1,16 +1,24 @@
+# ============================================================
+# Android Firmware Full Toolkit (AFFT) v2.0
+# By. soe1hom-arch / Wandi
+# ============================================================
+# Tool ini dilindungi hak cipta. Dilarang menghapus atau
+# mengubah kredit penulis tanpa izin.
+# ============================================================
+
 import sys
 from pathlib import Path
 import shutil
 import subprocess
 
-from .common import OperationResult, OUTPUT_DIR, TEMP_DIR, resolve_binary, safe_mkdir
+from .common import OperationResult, TEMP_DIR, resolve_binary, safe_mkdir
 from .filesystem import unpack_filesystem
 from .validate import is_sparse_image
 
 
-SUPER_WORK_DIR = TEMP_DIR / "super"
-SUPER_OUTPUT_DIR = OUTPUT_DIR / "super"
-SUPER_REPACK_DIR = OUTPUT_DIR / "repacked" / "super"
+SUPER_WORK_DIR = TEMP_DIR / "img_src"
+SUPER_OUTPUT_DIR = TEMP_DIR / "img"
+SUPER_REPACK_DIR = TEMP_DIR / "repacked"
 
 
 def _lpunpack():
@@ -30,7 +38,7 @@ def _clear_dir(path: Path):
 def _copy_super_results(work_dir: Path, out_dir: Path):
     copied = []
     for item in work_dir.iterdir():
-        if item.is_file() and item.suffix.lower() == ".img" and item.stat().st_size > 0:
+        if item.is_file() and item.suffix.lower() == ".img" and item.stat().st_size > 0            and item.name not in {"super.img", "super_raw.img"}:
             target = out_dir / item.name
             shutil.copy2(item, target)
             copied.append(item.name)
@@ -39,7 +47,7 @@ def _copy_super_results(work_dir: Path, out_dir: Path):
 
 def _write_super_readme(out_dir: Path, items: list[str]):
     lines = [
-        "Super image unpack result",
+        "Partition images from super.img unpack",
         "",
         "This folder contains copied partition images for easier browsing.",
         "",
@@ -102,7 +110,7 @@ def unpack_super(image_path: Path) -> OperationResult:
 
     try:
         _clear_dir(work_dir)
-        _clear_dir(out_dir)
+        safe_mkdir(out_dir)
 
         source_img = work_dir / image_path.name
         shutil.copy2(image_path, source_img)
@@ -192,18 +200,18 @@ def unpack_super(image_path: Path) -> OperationResult:
 def unpack_super_with_contents(image_path: Path) -> OperationResult:
     """Unpack super.img, lalu extract filesystem dari setiap partisi.
     
-    Membaca partisi dari OUTPUT_DIR/super/ (bukan dari TEMP_DIR/super/)
+    Membaca partisi dari TEMP_DIR/img/ (hasil unpack)
     karena unpack_super() sudah membersihkan temp/.
     """
     base_result = unpack_super(image_path)
     if not base_result.ok:
         return base_result
 
-    super_dir = Path(base_result.output_path)  # output/super/
-    contents_dir = super_dir / "contents"
+    super_dir = Path(base_result.output_path)  # temp/img/
+    contents_dir = TEMP_DIR / "contents"
     safe_mkdir(contents_dir)
 
-    # Baca partisi dari output/super/ — temp/super/ sudah dibersihkan
+    # Baca partisi dari temp/img/ (unified .img storage)
     partitions = _partition_images(super_dir)
     if not partitions:
         return OperationResult(
@@ -222,10 +230,9 @@ def unpack_super_with_contents(image_path: Path) -> OperationResult:
         else:
             extracted.append(f"{img.name} -> GAGAL: {fs_result.message}")
 
-    readme = super_dir / "README.txt"
+    readme = contents_dir / "README.txt"
     existing = readme.read_text(encoding="utf-8") if readme.exists() else ""
-    extra = "\n\nInner filesystem extraction:\n"
-    extra += "\n".join(f"- {line}" for line in extracted) + "\n"
+    extra = "\n".join(f"- {line}" for line in extracted) + "\n"
     readme.write_text(existing + extra, encoding="utf-8")
 
     ok_count = sum(1 for line in extracted if "GAGAL" not in line)
@@ -240,7 +247,7 @@ def unpack_super_with_contents(image_path: Path) -> OperationResult:
 def repack_super(work_dir: Path | None = None) -> OperationResult:
     """Repack super.img dari partisi .img di work_dir.
     
-    Default: baca dari OUTPUT_DIR/super/ (hasil unpack).
+    Default: baca dari TEMP_DIR/img/ (hasil unpack).
     """
     safe_mkdir(SUPER_REPACK_DIR)
     if work_dir is None:

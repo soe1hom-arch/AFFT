@@ -1,15 +1,23 @@
+# ============================================================
+# Android Firmware Full Toolkit (AFFT) v2.0
+# By. soe1hom-arch / Wandi
+# ============================================================
+# Tool ini dilindungi hak cipta. Dilarang menghapus atau
+# mengubah kredit penulis tanpa izin.
+# ============================================================
+
 import os
 from pathlib import Path
 import shutil
 import subprocess
 
-from .common import OperationResult, OUTPUT_DIR, TEMP_DIR, resolve_binary, safe_mkdir
+from .common import OperationResult, TEMP_DIR, resolve_binary, safe_mkdir
 from .validate import is_sparse_image, detect_fs_type
 
 
-FILESYSTEM_OUTPUT_DIR = OUTPUT_DIR / "filesystem"
-FILESYSTEM_REPACK_DIR = OUTPUT_DIR / "repacked" / "filesystem"
-FILESYSTEM_WORK_DIR = TEMP_DIR / "filesystem"
+FILESYSTEM_OUTPUT_DIR = TEMP_DIR / "contents"
+FILESYSTEM_REPACK_DIR = TEMP_DIR / "img"
+FILESYSTEM_WORK_DIR = TEMP_DIR / "filesystem_work"
 
 
 def _extract_erofs():
@@ -77,18 +85,41 @@ def unpack_filesystem(image_path: Path, output_base: Path | None = None) -> Oper
         source_img = image_path
 
         if is_sparse_image(source_img):
-            return OperationResult(
-                ok=False,
-                title=f"Unpack {image_path.name}",
-                message="Sparse filesystem image tidak didukung. Konversi dulu ke raw dengan simg2img.",
-                output_path=str(out_dir),
+            print(f"  [INFO] Terdeteksi sparse image, mengonversi dengan simg2img...")
+            simg2img = resolve_binary("simg2img")
+            if simg2img is None:
+                return OperationResult(
+                    ok=False,
+                    title=f"Unpack {image_path.name}",
+                    message="Binary 'simg2img' tidak ditemukan di bin/ atau PATH.",
+                    output_path=str(out_dir),
+                )
+            raw_img = TEMP_DIR / f"{source_img.stem}_raw.img"
+            if raw_img.exists():
+                raw_img.unlink()
+            convert = subprocess.run(
+                [str(simg2img), str(source_img), str(raw_img)],
+                check=False, capture_output=True, text=True,
             )
+            if convert.returncode != 0:
+                return OperationResult(
+                    ok=False,
+                    title=f"Unpack {image_path.name}",
+                    message=f"Gagal konversi sparse: {convert.stderr.strip() or 'unknown error'}",
+                    output_path=str(out_dir),
+                )
+            print(f"  [INFO] Konversi sparse selesai: {raw_img.name}")
+            source_img = raw_img
 
         fs_kind = detect_fs_type(source_img)
         if fs_kind == "unknown":
             name = image_path.name.lower()
             erofs_keywords = ("system", "vendor", "product", "system_ext",
-                              "vendor_dlkm", "system_dlkm", "mi_ext", "odm", "cust")
+                              "vendor_dlkm", "system_dlkm", "mi_ext", "odm", "cust",
+                              "my_product", "my_company", "my_preload", "my_region",
+                              "my_stock", "oplus_product", "oplus_company",
+                              "oplus_engineer", "oplus_vendor", "exclusive",
+                              "prism", "optics", "opconfig", "preload", "dalvik")
             fs_kind = "erofs" if any(k in name for k in erofs_keywords) else "ext4"
             print(f"  [WARN] Magic bytes tidak dikenal, tebak dari nama: {fs_kind}")
 
@@ -146,7 +177,7 @@ def unpack_filesystem(image_path: Path, output_base: Path | None = None) -> Oper
 def _find_ref_image(name: str) -> Path | None:
     """Cari referensi image untuk deteksi tipe filesystem.
     Cek di output/super/ dulu, lalu temp/super/."""
-    for base in (OUTPUT_DIR / "super", TEMP_DIR / "super"):
+    for base in (TEMP_DIR / "img", TEMP_DIR / "img_src"):
         candidate = base / f"{name}.img"
         if candidate.exists():
             return candidate
@@ -206,7 +237,11 @@ def repack_filesystem(work_dir: Path, output_img: Path | None = None) -> Operati
 
     if fs_kind == "unknown":
         keywords = ("system", "vendor", "product", "system_ext",
-                    "vendor_dlkm", "system_dlkm", "mi_ext", "odm", "cust")
+                    "vendor_dlkm", "system_dlkm", "mi_ext", "odm", "cust",
+                    "my_product", "my_company", "my_preload", "my_region",
+                    "my_stock", "oplus_product", "oplus_company",
+                    "oplus_engineer", "oplus_vendor", "exclusive",
+                    "prism", "optics", "opconfig", "preload", "dalvik")
         fs_kind = "erofs" if any(k in work_dir.name.lower() for k in keywords) else "ext4"
         print(f"  [WARN] Magic bytes tidak dikenal, tebak dari nama: {fs_kind}")
 

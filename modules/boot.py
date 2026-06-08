@@ -1,3 +1,11 @@
+# ============================================================
+# Android Firmware Full Toolkit (AFFT) v2.0
+# By. soe1hom-arch / Wandi
+# ============================================================
+# Tool ini dilindungi hak cipta. Dilarang menghapus atau
+# mengubah kredit penulis tanpa izin.
+# ============================================================
+
 from pathlib import Path
 import subprocess
 import shutil
@@ -6,14 +14,13 @@ from .common import (
     OperationResult,
     BIN_DIR,
     INPUT_DIR,
-    OUTPUT_DIR,
     TEMP_DIR,
     resolve_binary,
     safe_mkdir,
 )
 
 
-BOOT_OUTPUT_DIR = OUTPUT_DIR / "boot"
+BOOT_OUTPUT_DIR = TEMP_DIR / "boot_out"
 BOOT_WORK_DIR = TEMP_DIR / "boot"
 
 

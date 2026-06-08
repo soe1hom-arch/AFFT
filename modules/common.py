@@ -1,3 +1,11 @@
+# ============================================================
+# Android Firmware Full Toolkit (AFFT) v2.0
+# By. soe1hom-arch / Wandi
+# ============================================================
+# Tool ini dilindungi hak cipta. Dilarang menghapus atau
+# mengubah kredit penulis tanpa izin.
+# ============================================================
+
 import os
 import shutil
 import subprocess
@@ -9,14 +17,14 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 BIN_DIR = BASE_DIR / "bin"
 INPUT_DIR = BASE_DIR / "input"
-OUTPUT_DIR = BASE_DIR / "output"
+# OUTPUT_DIR = BASE_DIR / "output"  # (deprecated - all output now in TEMP_DIR)
 TEMP_DIR = BASE_DIR / "temp"
 LOGS_DIR = BASE_DIR / "logs"
 RUNTIME_BIN_DIR = Path.home()
 
 
 def ensure_workspace():
-    for path in (BIN_DIR, INPUT_DIR, OUTPUT_DIR, TEMP_DIR, LOGS_DIR, RUNTIME_BIN_DIR):
+    for path in (BIN_DIR, INPUT_DIR, TEMP_DIR, LOGS_DIR, RUNTIME_BIN_DIR):
         path.mkdir(parents=True, exist_ok=True)
 
 

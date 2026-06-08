@@ -1,3 +1,11 @@
+# ============================================================
+# Android Firmware Full Toolkit (AFFT) v2.0
+# By. soe1hom-arch / Wandi
+# ============================================================
+# Tool ini dilindungi hak cipta. Dilarang menghapus atau
+# mengubah kredit penulis tanpa izin.
+# ============================================================
+
 import os
 import shutil
 import subprocess
@@ -14,7 +22,7 @@ from modules.boot import (
     unpack_init_boot,
     unpack_vendor_boot,
 )
-from modules.common import INPUT_DIR, OUTPUT_DIR, TEMP_DIR, ensure_workspace, resolve_binary
+from modules.common import INPUT_DIR, TEMP_DIR, ensure_workspace, resolve_binary
 from modules.super import repack_super, unpack_super, unpack_super_with_contents
 
 
@@ -224,12 +232,25 @@ def menu_payload():
 
     print(f"\n{GREEN}[✓] payload.bin detected{RESET}")
     process = subprocess.Popen(
-        [str(tool), "-o", str(OUTPUT_DIR), str(payload_file)],
+        [str(tool), "-o", str(TEMP_DIR / "payload"), str(payload_file)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL
     )
     animated_progress(process, "Extracting payload.bin...")
-    print(f"Output : {OUTPUT_DIR}")
+    print(f"Output : {TEMP_DIR / 'payload'}")
+    # Copy .img files ke temp/img/ untuk dipakai menu lain
+    payload_dir = TEMP_DIR / "payload"
+    img_dir = TEMP_DIR / "img"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    img_count = 0
+    for f in payload_dir.iterdir():
+        if f.is_file() and f.suffix.lower() == ".img":
+            target = img_dir / f.name
+            if not target.exists():
+                shutil.copy2(f, target)
+                img_count += 1
+    if img_count > 0:
+        print(f"{GREEN}[✓] {img_count} .img files copied to temp/img/ (ready for repack){RESET}")
     input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
 
 
@@ -244,7 +265,7 @@ def menu_super():
 {CYAN}[1]{RESET} Unpack super.img only
 {CYAN}[2]{RESET} Unpack super.img + extract filesystem
 {CYAN}[3]{RESET} Repack super.img only
-{CYAN}[4]{RESET} Repack super.img + filesystem
+{CYAN}[4]{RESET} Repack all filesystem (contents → .img)
 {CYAN}[5]{RESET} Back
 """)
         choice = input("Select Menu : ").strip()
@@ -287,7 +308,7 @@ def menu_super():
 
                 print(f"\n{YELLOW}[•] Step 2/2 — Extracting filesystem{RESET}")
                 from modules.filesystem import unpack_filesystem
-                contents_dir = out / "contents"
+                contents_dir = TEMP_DIR / "contents"
                 contents_dir.mkdir(parents=True, exist_ok=True)
 
                 ok_count = 0
@@ -314,9 +335,9 @@ def menu_super():
             input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
 
         elif choice == "4":
-            # Repack super.img + filesystem (reverse dari option 2)
-            filesystem_dir = OUTPUT_DIR / "super" / "contents"
-            super_img_dir = OUTPUT_DIR / "super"
+            # Repack all filesystem contents -> .img (reverse dari option 2)
+            filesystem_dir = TEMP_DIR / "contents"
+            super_img_dir = TEMP_DIR / "img"
 
             if not filesystem_dir.exists() or not any(filesystem_dir.iterdir()):
                 print(f"\n{RED}[✗] Tidak ada filesystem contents ditemukan.{RESET}")
@@ -325,12 +346,12 @@ def menu_super():
                 continue
 
             if not super_img_dir.exists():
-                print(f"\n{RED}[✗] No partition images found in output/super/!{RESET}")
+                print(f"\n{RED}[✗] No partition images found in temp/img/!{RESET}")
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
                 continue
 
             # Step 1/2: Repack filesystem contents -> .img
-            print(f"\n{YELLOW}[•] Step 1/2 — Repacking filesystem contents into images{RESET}")
+            print(f"\n{YELLOW}[•] Step 1/1 — Repacking all filesystem contents into images{RESET}")
             from modules.filesystem import repack_filesystem
 
             ok_count = 0
@@ -360,10 +381,9 @@ def menu_super():
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
                 continue
 
-            # Step 2/2: Repack super.img
-            print(f"\n{YELLOW}[•] Step 2/2 — Repacking super.img{RESET}")
-            result2 = run_with_progress("Repacking super.img...", repack_super)
-            print_result(result2)
+            # Hasil: .img files sudah diperbarui di super_out/ untuk repack super.img
+            print(f"{GREEN}[✓] Semua filesystem berhasil direpack. .img ada di super_out/{RESET}")
+            print(f"{YELLOW}  Gunakan menu [3] untuk repack super.img{RESET}")
             input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
 
         elif choice == "5":
@@ -382,92 +402,157 @@ def menu_filesystem():
     while True:
         print(f"""
 {CYAN}[1]{RESET} Extract filesystem IMG (from input/)
-{CYAN}[2]{RESET} Repack filesystem IMG (from temp/filesystem/)
+{CYAN}[2]{RESET} Repack filesystem IMG (from temp/contents/)
 {CYAN}[3]{RESET} Back
 """)
         choice = input("Select Menu : ").strip()
 
+        # =========== EXTRACT ===========
         if choice == "1":
             from modules.filesystem import unpack_filesystem
             candidates = sorted(
                 [p for p in INPUT_DIR.iterdir()
                  if p.is_file() and p.suffix.lower() == ".img"
-                 and p.name not in ("super.img", "payload.bin")]
+                 and p.name not in ("super.img", "payload.bin", "super_raw.img")]
             )
+            # Also cari dari temp/img/ (hasil unpack super.img / payload)
+            img_dir = TEMP_DIR / "img"
+            if img_dir.exists():
+                for p in img_dir.iterdir():
+                    if p.is_file() and p.suffix.lower() == ".img"                        and p.name not in ("super.img", "payload.bin", "super_raw.img")                        and p not in candidates:
+                        candidates.append(p)
+                candidates = sorted(set(candidates))
             if not candidates:
-                print(f"\n{RED}[✗] No filesystem IMG found in 'input' folder!{RESET}")
+                print(f"\n{RED}[✗] No filesystem IMG found!{RESET}")
+                print(f"{YELLOW}  Letakkan .img di input/ atau extract dari super.img dulu.{RESET}")
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
                 continue
 
-            print(f"\n{CYAN}Choose filesystem image:{RESET}\n")
-            for idx, img in enumerate(candidates, 1):
-                size_mb = img.stat().st_size / (1024 * 1024)
-                print(f"[{idx}] {img.name}  ({size_mb:.1f} MB)")
+            while True:
+                print(f"""
+{CYAN}[1]{RESET} Extract single image
+{CYAN}[2]{RESET} Extract ALL images
+{CYAN}[3]{RESET} Back
+""")
+                sub = input("Select : ").strip()
 
-            try:
-                sel = int(input("\nSelect file : ").strip())
-                if 1 <= sel <= len(candidates):
-                    chosen = candidates[sel - 1]
+                if sub == "1":
+                    print(f"\n{CYAN}Choose filesystem image:{RESET}\n")
+                    for idx, img in enumerate(candidates, 1):
+                        size_mb = img.stat().st_size / (1024 * 1024)
+                        print(f"[{idx}] {img.name}  ({size_mb:.1f} MB)")
+                    try:
+                        sel = int(input("\nSelect file : ").strip())
+                        if 1 <= sel <= len(candidates):
+                            chosen = candidates[sel - 1]
+                        else:
+                            print(f"{RED}[✗] Pilihan di luar jangkauan.{RESET}")
+                            input(f"\n{YELLOW}Press Enter...{RESET}")
+                            continue
+                    except Exception:
+                        print(f"{RED}[✗] Input tidak valid.{RESET}")
+                        input(f"\n{YELLOW}Press Enter...{RESET}")
+                        continue
+                    result = run_with_progress(
+                        f"Extracting {chosen.name}...",
+                        lambda: unpack_filesystem(chosen)
+                    )
+                    print_result(result)
+                    input(f"\n{YELLOW}Press Enter...{RESET}")
+
+                elif sub == "2":
+                    ok = fail = 0
+                    for img in candidates:
+                        r = run_with_progress(
+                            f"Extracting {img.name}...",
+                            lambda i=img: unpack_filesystem(i)
+                        )
+                        if r.ok:
+                            ok += 1
+                        else:
+                            fail += 1
+                            print(f"  {RED}\u2192 {img.name}: {r.message}{RESET}")
+                    print(f"\n{GREEN}[✓] Done: {ok} success{RESET}" +
+                          (f", {RED}{fail} failed{RESET}" if fail else ""))
+                    input(f"\n{YELLOW}Press Enter...{RESET}")
+
+                elif sub == "3":
+                    break
                 else:
-                    print(f"{RED}[✗] Pilihan di luar jangkauan.{RESET}")
-                    input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-                    continue
-            except Exception:
-                print(f"{RED}[✗] Input tidak valid.{RESET}")
-                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-                continue
+                    print(f"{RED}[✗] Invalid{RESET}")
 
-            result = run_with_progress(
-                f"Extracting {chosen.name}...",
-                lambda: unpack_filesystem(chosen)
-            )
-            print_result(result)
-            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-
+        # =========== REPACK ===========
         elif choice == "2":
             from modules.filesystem import repack_filesystem
-            fs_root = TEMP_DIR / "filesystem"
+            fs_root = TEMP_DIR / "contents"
             if not fs_root.exists():
-                print(f"\n{RED}[✗] Folder temp/filesystem/ tidak ditemukan!{RESET}")
+                print(f"\n{RED}[✗] Folder temp/contents/ tidak ditemukan!{RESET}")
                 print(f"{YELLOW}  Extract filesystem terlebih dahulu (menu [2] \u2192 [2] atau menu [3] \u2192 [1]).{RESET}")
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
                 continue
 
             folders = sorted([d for d in fs_root.iterdir() if d.is_dir()])
             if not folders:
-                print(f"\n{RED}[✗] Tidak ada folder hasil extract di temp/filesystem/!{RESET}")
+                print(f"\n{RED}[✗] Tidak ada folder hasil extract di temp/contents/!{RESET}")
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
                 continue
 
-            print(f"\n{CYAN}Choose folder to repack:{RESET}\n")
-            for idx, folder in enumerate(folders, 1):
-                size_mb = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file()) / (1024 * 1024)
-                print(f"[{idx}] {folder.name}  ({size_mb:.1f} MB)")
+            while True:
+                print(f"""
+{CYAN}[1]{RESET} Repack single folder
+{CYAN}[2]{RESET} Repack ALL folders
+{CYAN}[3]{RESET} Back
+""")
+                sub = input("Select : ").strip()
 
-            try:
-                sel = int(input("\nSelect folder : ").strip())
-                if 1 <= sel <= len(folders):
-                    target_folder = folders[sel - 1]
+                if sub == "1":
+                    print(f"\n{CYAN}Choose folder to repack:{RESET}\n")
+                    for idx, folder in enumerate(folders, 1):
+                        size_mb = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file()) / (1024 * 1024)
+                        print(f"[{idx}] {folder.name}  ({size_mb:.1f} MB)")
+                    try:
+                        sel = int(input("\nSelect folder : ").strip())
+                        if 1 <= sel <= len(folders):
+                            target_folder = folders[sel - 1]
+                        else:
+                            print(f"{RED}[✗] Pilihan di luar jangkauan.{RESET}")
+                            input(f"\n{YELLOW}Press Enter...{RESET}")
+                            continue
+                    except Exception:
+                        print(f"{RED}[✗] Input tidak valid.{RESET}")
+                        input(f"\n{YELLOW}Press Enter...{RESET}")
+                        continue
+
+                    print(f"\n{GREEN}[✓] Selected : {target_folder.name}{RESET}")
+                    out_img = TEMP_DIR / "img" / f"{target_folder.name}.img"
+                    result = run_with_progress(
+                        f"Repacking {target_folder.name}...",
+                        lambda: repack_filesystem(target_folder, output_img=out_img)
+                    )
+                    print_result(result)
+                    input(f"\n{YELLOW}Press Enter...{RESET}")
+
+                elif sub == "2":
+                    ok = fail = 0
+                    for folder in folders:
+                        out_img = TEMP_DIR / "img" / f"{folder.name}.img"
+                        r = run_with_progress(
+                            f"Repacking {folder.name}...",
+                            lambda f=folder, o=out_img: repack_filesystem(f, output_img=o)
+                        )
+                        if r.ok:
+                            ok += 1
+                        else:
+                            fail += 1
+                            print(f"  {RED}\u2192 {folder.name}: {r.message}{RESET}")
+                    print(f"\n{GREEN}[✓] Done: {ok} success{RESET}" +
+                          (f", {RED}{fail} failed{RESET}" if fail else ""))
+                    input(f"\n{YELLOW}Press Enter...{RESET}")
+
+                elif sub == "3":
+                    break
                 else:
-                    print(f"{RED}[✗] Pilihan di luar jangkauan.{RESET}")
-                    input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-                    continue
-            except Exception:
-                print(f"{RED}[✗] Input tidak valid.{RESET}")
-                input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
-                continue
-
-            print(f"\n{GREEN}[✓] Selected : {target_folder.name}{RESET}")
-
-            out_dir = OUTPUT_DIR / "repacked" / "filesystem"
-            out_img = out_dir / f"{target_folder.name}.img"
-
-            result = run_with_progress(
-                f"Repacking {target_folder.name}...",
-                lambda: repack_filesystem(target_folder, output_img=out_img)
-            )
-            print_result(result)
-            input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
+                    print(f"{RED}[✗] Invalid{RESET}")
 
         elif choice == "3":
             break
@@ -543,7 +628,7 @@ def menu_boot():
 
 def menu_clean():
     show_header()
-    for folder in [OUTPUT_DIR, TEMP_DIR]:
+    for folder in [TEMP_DIR]:
         if folder.exists():
             for item in folder.iterdir():
                 try:

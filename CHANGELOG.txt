@@ -1,36 +1,35 @@
 CHANGELOG - Android Firmware Full Toolkit (AFFT)
 ===========================================
 
-v2.1
-----
-
-- Fixed Sparse Super.img Support
-- Added Automatic simg2img Conversion
-- Added Extraction Validation
-- Improved lpunpack Workflow
-- Improved HyperOS Fastboot Compatibility
-
-v2.0 (2025-06-08)
+v2.0 (2026-06-08)
 -----------------
 
-[+] Fitur Baru:
+[+] Fitur Baru v2.0:
     - Menu repack super.img (Submenu [2] → [3] dan [4])
     - Menu repack filesystem satu per satu (Submenu [3] → [2])
     - Filesystem extraction & repack mandiri tanpa super.img
     - Modular code dengan modules/ (super.py, filesystem.py, boot.py, validate.py)
     - Boot family (unpack/repack boot.img, vendor_boot.img, init_boot.img)
+    - Batch mode: Extract/Repack ALL filesystem sekaligus
+    - Unified storage: Semua hasil operasi tersimpan di temp/ (img/, contents/, repacked/)
+    - Sparse auto-conversion di filesystem unpack (simg2img otomatis)
+    - Skip partisi 0-byte (slot B kosong otomatis dilewati)
+    - Keyword EROFS diperluas (24 keyword: my_product, oplus_*, dll)
+    - Payload.bin hasil extract otomatis dicopy ke temp/img/
+    - Menu [3] → [1] Extract FS: cari .img dari input/ DAN temp/img/
     - Banner utama di menu, header sederhana di submenu
 
 [!] Perbaikan Bug:
     - Fix "work_dir not defined" pada unpack_super_with_contents
-    - Fix misleading error message "temp/super/" jadi "output/super/"
+    - Fix misleading error message "temp/super/" jadi "temp/img/"
     - Fix UnboundLocalError: fs_kind dipakai sebelum diisi
     - Fix SIGSYS pada simg2img/mkfs.erofs (ganti ke NDK build)
     - Fix libuuid.so not found (LD_LIBRARY_PATH otomatis)
+    - Output tidak lagi terduplikasi (semua di temp/, tanpa output/)
 
 [*] Peningkatan:
     - Binary mkfs.erofs & extract.erofs: Android NDK static build (kompatibel 100%)
-    - Storage lebih hemat: temp/super/ dibersihkan otomatis
+    - Storage lebih hemat: tidak ada duplikasi output/ + temp/
     - Filter super.img & super_raw.img tidak ikut extract
     - Binary opsional tidak wajib (mkfs.erofs, make_ext4fs, lpmake)
     - Binary resolver otomatis: PATH > $HOME/ > bin/ lokal
