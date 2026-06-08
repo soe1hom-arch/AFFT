@@ -26,7 +26,7 @@ case "${answer:-Y}" in
 esac
 
 pkg update -y
-pkg install -y curl unzip python
+pkg install -y wget unzip python
 termux-setup-storage || true
 
 if [ -d "$WORKDIR" ]; then
@@ -43,7 +43,7 @@ fi
 mkdir -p "$WORKDIR"
 cd "$TMPDIR"
 echo "Downloading AFFT v2.0..."
-curl -fL "https://github.com/$REPO/releases/download/$TAG/$ZIP_NAME" -o "$ARCHIVE"
+wget -q --show-progress "https://github.com/$REPO/releases/download/$TAG/$ZIP_NAME" -O "$ARCHIVE"
 unzip -q "$ARCHIVE" -d "$WORKDIR"
 cd "$WORKDIR/AFFT"
 
