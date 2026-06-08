@@ -49,6 +49,16 @@ cd "$WORKDIR/AFFT"
 
 chmod +x main.py bin/* 2>/dev/null || true
 
+# Buat perintah "afft" biar bisa dipanggil dari mana aja
+cat > "$PREFIX/bin/afft" << 'WRAPPER'
+#!/data/data/com.termux/files/usr/bin/bash
+cd "$WORKDIR/AFFT"
+exec python main.py "$@"
+WRAPPER
+chmod +x "$PREFIX/bin/afft"
+
+
+
 echo ""
 echo "╔══════════════════════════════════════════════╗"
 echo "║  AFFT v2.0 installed!                       ║"
