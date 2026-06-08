@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO="soe1hom-arch/android-firmware-toolkit"
-TAG="v2.1.2-full"
-ZIP_NAME="AFT_TOLLS-v2.1.2-full.zip"
+TAG="v2.0"
+ZIP_NAME="AFFT-v2.0-full.zip"
 WORKDIR="$HOME/android-firmware-toolkit"
 TMPDIR="$(mktemp -d)"
 ARCHIVE="$TMPDIR/$ZIP_NAME"
@@ -11,9 +11,9 @@ ARCHIVE="$TMPDIR/$ZIP_NAME"
 clear
 cat <<'EOF'
 ========================================
- Android Firmware Toolkit Installer
+ Android Firmware Full Toolkit (AFFT)
 ========================================
-This installs the full package for Termux.
+Installer for Termux
 EOF
 
 printf '\nInstall path: %s\n' "$WORKDIR"
@@ -29,7 +29,7 @@ pkg update -y
 pkg install -y curl unzip python
 termux-setup-storage || true
 
-if [ -d "$WORKDIR/AFT_TOLLS" ]; then
+if [ -d "$WORKDIR/AFFT" ]; then
   read -r -p "Existing install found. Replace it? [Y/n] " overwrite
   case "${overwrite:-Y}" in
     n|N)
@@ -37,21 +37,22 @@ if [ -d "$WORKDIR/AFT_TOLLS" ]; then
       exit 0
       ;;
   esac
-  rm -rf "$WORKDIR/AFT_TOLLS"
+  rm -rf "$WORKDIR/AFFT"
 fi
 
 mkdir -p "$WORKDIR"
 cd "$TMPDIR"
 curl -fL "https://github.com/$REPO/releases/download/$TAG/$ZIP_NAME" -o "$ARCHIVE"
 unzip -q "$ARCHIVE" -d "$WORKDIR"
-cd "$WORKDIR/AFT_TOLLS"
+cd "$WORKDIR/AFFT"
 
 chmod +x main.py bin/* 2>/dev/null || true
 
 cat <<EOF
-Installed to: $WORKDIR/AFT_TOLLS
+========================================
+Installed to: $WORKDIR/AFFT
 
 Run:
-  cd $WORKDIR/AFT_TOLLS
+  cd $WORKDIR/AFFT
   python main.py
 EOF

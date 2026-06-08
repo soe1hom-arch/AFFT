@@ -1,20 +1,26 @@
 # Third-Party Notices
 
-This source-only repository does not include bundled helper binaries under
-`bin/`.
+This repository includes helper binaries under `bin/` that are subject to their
+own upstream licenses and copyright terms.
 
-If you distribute a separate binary package, those binaries are not covered by
-the license in `LICENSE` unless their upstream licenses explicitly allow it.
-Each tool remains subject to its own upstream license and copyright terms.
+## Bundled Binaries
 
-Bundled tools:
+| Binary | Fungsi | Sumber / Kredit |
+|--------|--------|-----------------|
+| `payload-dumper-go` | Extract payload.bin | [ssut](https://github.com/ssut/payload-dumper-go) |
+| `lpunpack` | Unpack logical partitions | [AOSP](https://android.googlesource.com/platform/system/core/) |
+| `lpmake` | Membangun super.img | [AOSP](https://android.googlesource.com/platform/system/core/) |
+| `simg2img` | Konversi sparse Android image | [AOSP](https://android.googlesource.com/platform/system/core/) |
+| `extract.erofs` | Extract filesystem EROFS | [erofs-utils](https://github.com/sekaiacg/erofs-utils) (NDK build by sekaiacg) |
+| `mkfs.erofs` | Membuat filesystem EROFS | [erofs-utils](https://github.com/sekaiacg/erofs-utils) (NDK build by sekaiacg) |
+| `debugfs` | Extract & debug ext4 | [e2fsprogs](https://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git/) (Static: Tsurugi Linux) |
+| `make_ext4fs` | Membuat filesystem ext4 | [AOSP / rendiix](https://github.com/rendiix/make_ext4fs) |
+| `magiskboot` | Unpack/repack boot image | [Magisk](https://github.com/topjohnwu/Magisk) — John Wu (topjohnwu) |
 
-- `payload-dumper-go`
-- `lpunpack`
-- `simg2img`
-- `extract.erofs`
-- `debugfs`
+## License
 
-Before redistributing any separate binary package, verify the redistribution
-terms for each tool and add the corresponding upstream license notices if
-required.
+The original project files in this repository are licensed under the MIT License.
+See `LICENSE` for details.
+
+Each binary tool remains subject to its own upstream license. Before
+redistributing this package, verify the redistribution terms for each tool.
