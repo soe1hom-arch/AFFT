@@ -15,9 +15,15 @@ from modules.boot import (
     repack_boot,
     repack_init_boot,
     repack_vendor_boot,
+    repack_dtbo,
+    repack_recovery,
+    repack_vbmeta,
     unpack_boot,
     unpack_init_boot,
     unpack_vendor_boot,
+    unpack_dtbo,
+    unpack_recovery,
+    unpack_vbmeta,
 )
 from modules.common import INPUT_DIR, TEMP_DIR, ensure_workspace, resolve_binary
 from modules.super import repack_super, unpack_super, unpack_super_with_contents
@@ -169,17 +175,24 @@ def print_result(result):
 
 
 def choose_image(prompt: str, predicate=None) -> Path | None:
-    candidates = sorted(
-        [p for p in INPUT_DIR.iterdir() if p.is_file() and (predicate(p) if predicate else True)]
-    )
+    candidates = []
+    for folder in [INPUT_DIR, TEMP_DIR / "img"]:
+        if folder.exists():
+            for p in folder.iterdir():
+                if p.is_file() and (predicate(p) if predicate else True):
+                    if p not in candidates:
+                        candidates.append(p)
+    candidates = sorted(set(candidates))
+
     if not candidates:
-        print(f"\n{RED}[✗] Tidak ada file ditemukan di input/{RESET}")
+        print(f"\n{RED}[✗] Tidak ada file ditemukan di input/ atau temp/img/{RESET}")
         return None
 
     print(f"\n{CYAN}{prompt}{RESET}\n")
     for index, item in enumerate(candidates, start=1):
         size_mb = item.stat().st_size / (1024 * 1024)
-        print(f"[{index}] {item.name}  ({size_mb:.1f} MB)")
+        folder_label = item.parent.name
+        print(f"[{index}] {item.name}  ({size_mb:.1f} MB)  [{folder_label}]")
 
     try:
         choice = int(input("\nSelect file : ").strip())
@@ -193,15 +206,15 @@ def choose_image(prompt: str, predicate=None) -> Path | None:
 
 
 def is_boot_candidate(path: Path) -> bool:
-    return path.name.lower() == "boot.img"
+    return path.name.lower() in ("boot.img", "recovery.img", "dtbo.img", "dtb.img")
 
 
 def is_vendor_boot_candidate(path: Path) -> bool:
-    return path.name.lower() == "vendor_boot.img"
+    return path.name.lower() in ("vendor_boot.img", "init_boot.img")
 
 
-def is_init_boot_candidate(path: Path) -> bool:
-    return path.name.lower() == "init_boot.img"
+def is_vbmeta_candidate(path: Path) -> bool:
+    return path.name.lower() in ("vbmeta.img", "vbmeta_vendor.img", "vbmeta_system.img", "vendor_kernel_boot.img")
 
 
 def is_super_candidate(path: Path) -> bool:
@@ -280,7 +293,7 @@ def menu_super():
                                    and f.name not in {"super.img", "super_raw.img"} \
                                    and f.stat().st_size > 0])
                     if imgs:
-                        print(f"\n{GREEN}[✓] Extracted {len(imgs)} partitions:{RESET}")
+                        print(f"\n{GREEN}[✓] Extracted {len(imgs)} partitions (non-zero):{RESET}")
                         for name in imgs:
                             print(f"  \u2022 {name}")
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
@@ -521,7 +534,7 @@ def menu_filesystem():
                         continue
 
                     print(f"\n{GREEN}[✓] Selected : {target_folder.name}{RESET}")
-                    out_img = TEMP_DIR / "img" / f"{target_folder.name}.img"
+                    out_img = TEMP_DIR / "img" / f"{target_folder.name}_repack.img"
                     result = run_with_progress(
                         f"Repacking {target_folder.name}...",
                         lambda: repack_filesystem(target_folder, output_img=out_img)
@@ -532,7 +545,7 @@ def menu_filesystem():
                 elif sub == "2":
                     ok = fail = 0
                     for folder in folders:
-                        out_img = TEMP_DIR / "img" / f"{folder.name}.img"
+                        out_img = TEMP_DIR / "img" / f"{folder.name}_repack.img"
                         r = run_with_progress(
                             f"Repacking {folder.name}...",
                             lambda f=folder, o=out_img: repack_filesystem(f, output_img=o)
@@ -567,12 +580,12 @@ def menu_boot():
     while True:
         print(f"""
 {CYAN}[1]{RESET} Check boot family
-{CYAN}[2]{RESET} Unpack boot.img
-{CYAN}[3]{RESET} Unpack vendor_boot.img
-{CYAN}[4]{RESET} Unpack init_boot.img
-{CYAN}[5]{RESET} Repack boot.img
-{CYAN}[6]{RESET} Repack vendor_boot.img
-{CYAN}[7]{RESET} Repack init_boot.img
+{CYAN}[2]{RESET} Unpack boot/recovery/dtbo
+{CYAN}[3]{RESET} Unpack vendor_boot/init_boot
+{CYAN}[4]{RESET} Unpack vbmeta/vendor_kernel_boot
+{CYAN}[5]{RESET} Repack boot/recovery/dtbo
+{CYAN}[6]{RESET} Repack vendor_boot/init_boot
+{CYAN}[7]{RESET} Repack vbmeta/vendor_kernel_boot
 {CYAN}[8]{RESET} Back
 """)
         choice = input("Select Menu : ").strip()
@@ -585,31 +598,91 @@ def menu_boot():
         elif choice == "2":
             image = choose_image("Choose boot image:", is_boot_candidate)
             if image:
-                result = run_with_progress("Unpacking boot.img...", lambda: unpack_boot(image))
+                name_lower = image.name.lower()
+                if name_lower == "recovery.img":
+                    fn = lambda: unpack_recovery(image)
+                    label = "recovery.img"
+                elif name_lower in ("dtbo.img", "dtb.img"):
+                    fn = lambda: unpack_dtbo(image)
+                    label = "dtbo.img"
+                else:
+                    fn = lambda: unpack_boot(image)
+                    label = "boot.img"
+                result = run_with_progress(f"Unpacking {label}...", fn)
                 print_result(result)
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
         elif choice == "3":
-            image = choose_image("Choose vendor_boot image:", is_vendor_boot_candidate)
+            image = choose_image("Choose vendor_boot/init_boot image:", is_vendor_boot_candidate)
             if image:
-                result = run_with_progress("Unpacking vendor_boot.img...", lambda: unpack_vendor_boot(image))
+                name_lower = image.name.lower()
+                if name_lower == "init_boot.img":
+                    fn = lambda: unpack_init_boot(image)
+                    label = "init_boot.img"
+                else:
+                    fn = lambda: unpack_vendor_boot(image)
+                    label = "vendor_boot.img"
+                result = run_with_progress(f"Unpacking {label}...", fn)
                 print_result(result)
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
         elif choice == "4":
-            image = choose_image("Choose init_boot image:", is_init_boot_candidate)
+            image = choose_image("Choose vbmeta/kernel_boot image:", is_vbmeta_candidate)
             if image:
-                result = run_with_progress("Unpacking init_boot.img...", lambda: unpack_init_boot(image))
+                name_lower = image.name.lower()
+                if name_lower == "vendor_kernel_boot.img":
+                    fn = lambda: unpack_init_boot(image)
+                    label = "vendor_kernel_boot.img"
+                else:
+                    fn = lambda: unpack_vbmeta(image)
+                    label = "vbmeta.img"
+                result = run_with_progress(f"Unpacking {label}...", fn)
                 print_result(result)
                 input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
         elif choice == "5":
-            result = run_with_progress("Repacking boot.img...", repack_boot)
+            print(f"""
+{CYAN}[1]{RESET} Repack boot.img
+{CYAN}[2]{RESET} Repack recovery.img
+{CYAN}[3]{RESET} Repack dtbo.img
+{CYAN}[4]{RESET} Back
+""")
+            sub = input("Select : ").strip()
+            if sub == "1":
+                result = run_with_progress("Repacking boot.img...", repack_boot)
+            elif sub == "2":
+                result = run_with_progress("Repacking recovery.img...", repack_recovery)
+            elif sub == "3":
+                result = run_with_progress("Repacking dtbo.img...", repack_dtbo)
+            else:
+                continue
             print_result(result)
             input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
         elif choice == "6":
-            result = run_with_progress("Repacking vendor_boot.img...", repack_vendor_boot)
+            print(f"""
+{CYAN}[1]{RESET} Repack vendor_boot.img
+{CYAN}[2]{RESET} Repack init_boot.img
+{CYAN}[3]{RESET} Back
+""")
+            sub = input("Select : ").strip()
+            if sub == "1":
+                result = run_with_progress("Repacking vendor_boot.img...", repack_vendor_boot)
+            elif sub == "2":
+                result = run_with_progress("Repacking init_boot.img...", repack_init_boot)
+            else:
+                continue
             print_result(result)
             input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
         elif choice == "7":
-            result = run_with_progress("Repacking init_boot.img...", repack_init_boot)
+            print(f"""
+{CYAN}[1]{RESET} Repack vbmeta.img
+{CYAN}[2]{RESET} Repack vendor_kernel_boot.img
+{CYAN}[3]{RESET} Back
+""")
+            sub = input("Select : ").strip()
+            if sub == "1":
+                result = run_with_progress("Repacking vbmeta.img...", repack_vbmeta)
+            elif sub == "2":
+                result = run_with_progress("Repacking init_boot.img...", repack_init_boot)
+            else:
+                continue
             print_result(result)
             input(f"\n{YELLOW}Press Enter to return to menu...{RESET}")
         elif choice == "8":
@@ -617,6 +690,7 @@ def menu_boot():
         else:
             print(f"\n{RED}[✗] Invalid menu{RESET}")
             input(f"\n{YELLOW}Press Enter to try again...{RESET}")
+
 
 
 # =========================================================

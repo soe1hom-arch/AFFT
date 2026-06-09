@@ -1,6 +1,30 @@
 CHANGELOG - Android Firmware Full Toolkit (AFFT)
 ===========================================
 
+v2.0.1 (2026-06-09)
+-------------------
+
+[!] Perbaikan Bug:
+    - Fix vendor_boot.img unpack gagal (exit code 3 = vendor_boot detected, BUKAN error)
+      - magiskboot return code 3 khusus untuk vendor_boot, sekarang dianggap sukses
+    - Fix boot unpack: file sumber tidak lagi dihapus setelah unpack (diperlukan untuk repack)
+    - Fix repack boot gagal karena source image tidak ditemukan di work_dir
+
+[+] Fitur Baru:
+    - Dukungan partisi boot diperluas: recovery.img, dtbo.img, vbmeta.img,
+      vbmeta_vendor.img, vbmeta_system.img, vendor_kernel_boot.img
+    - Menu boot dirombak jadi 3 kategori dengan sub-menu repack spesifik:
+      [2] boot/recovery/dtbo | [3] vendor_boot/init_boot | [4] vbmeta/vendor_kernel_boot
+    - Fungsi baru: unpack_dtbo(), unpack_recovery(), unpack_vbmeta(),
+      repack_dtbo(), repack_recovery(), repack_vbmeta()
+
+[*] Peningkatan:
+    - Super repack output: super_repack.img (bukan super.img)
+    - Filesystem repack output: *_repack.img
+    - Boot repack sudah pakai _repack.img (sebelumnya)
+    - Candidate functions disesuaikan dengan menu baru
+    - boot_family_status() scan input/ dan temp/img/
+
 v2.0 (2026-06-08)
 -----------------
 

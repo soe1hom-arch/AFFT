@@ -269,7 +269,7 @@ def repack_super(work_dir: Path | None = None) -> OperationResult:
         )
 
     try:
-        output_img = SUPER_REPACK_DIR / "super.img"
+        output_img = SUPER_REPACK_DIR / "super_repack.img"
 
         cmd = [str(lpmake)]
         cmd.extend(["--device-size=auto"])
