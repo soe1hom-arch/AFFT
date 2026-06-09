@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO="soe1hom-arch/AFFT"
-TAG="v2.0"
-ZIP_NAME="AFFT-v2.0-full.zip"
+TAG="v2.0.1"
+ZIP_NAME="AFFT-v2.0.1-full.zip"
 WORKDIR="$HOME/AFFT"
 TMPDIR="$(mktemp -d)"
 ARCHIVE="$TMPDIR/$ZIP_NAME"
@@ -42,7 +42,7 @@ fi
 
 mkdir -p "$WORKDIR"
 cd "$TMPDIR"
-echo "Downloading AFFT v2.0..."
+echo "Downloading AFFT v2.0.1..."
 wget -q --show-progress "https://github.com/$REPO/releases/download/$TAG/$ZIP_NAME" -O "$ARCHIVE"
 unzip -q "$ARCHIVE" -d "$WORKDIR"
 cd "$WORKDIR/AFFT"
@@ -61,7 +61,7 @@ chmod +x "$PREFIX/bin/afft"
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"
-echo "║  AFFT v2.0 installed!                       ║"
+echo "║  AFFT v2.0.1 installed!                       ║"
 echo "║                                              ║"
 echo "║  Run:                                        ║"
 echo "║    cd $WORKDIR/AFFT                          ║"

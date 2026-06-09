@@ -82,3 +82,68 @@ def detect_fs_type(path: Path) -> str:
         return "ext4"
 
     return "unknown"
+
+
+def raw_to_sparse(raw_path: Path, sparse_path: Path, block_size: int = 4096) -> bool:
+    """Konversi raw image ke Android sparse format.
+    
+    Args:
+        raw_path: Path ke raw image
+        sparse_path: Path output untuk sparse image
+        block_size: Block size (default 4096)
+    
+    Returns:
+        True jika berhasil, False jika gagal
+    """
+    try:
+        raw_data = raw_path.read_bytes()
+        data_len = len(raw_data)
+        
+        # Hitung block
+        blocks = (data_len + block_size - 1) // block_size
+        padded_len = blocks * block_size
+        
+        # Sparse header: 28 bytes
+        # struct: magic(4) major(2) minor(2) file_hdr_sz(2) chunk_hdr_sz(2)
+        #         blk_sz(4) total_blks(4) total_chunks(4) crc32(4)
+        file_hdr_sz = 28
+        chunk_hdr_sz = 12
+        total_sz = file_hdr_sz + chunk_hdr_sz + padded_len
+        
+        sparse_header = struct.pack(
+            "<IHHIIIII",
+            0xED26FF3A,  # magic
+            1,            # major_version
+            0,            # minor_version
+            file_hdr_sz,  # file_hdr_sz
+            chunk_hdr_sz, # chunk_hdr_sz
+            block_size,   # blk_sz
+            blocks,       # total_blks
+            1,            # total_chunks (1 RAW chunk)
+            0,            # crc32 (optional)
+        )
+        
+        # Chunk header: 12 bytes
+        # struct: chunk_type(2) reserved(2) chunk_sz(4) total_sz(4)
+        chunk_header = struct.pack(
+            "<HHII",
+            0xCAC1,  # chunk_type: RAW
+            0,       # reserved
+            blocks,  # chunk_sz in blocks
+            chunk_hdr_sz + padded_len,  # total_sz: header + data
+        )
+        
+        # Write sparse file
+        with open(sparse_path, "wb") as f:
+            f.write(sparse_header)
+            f.write(chunk_header)
+            f.write(raw_data)
+            # Padding ke block_size
+            if padded_len > data_len:
+                f.write(b'\x00' * (padded_len - data_len))
+        
+        return True
+        
+    except Exception as e:
+        print(f"  [ERROR] Konversi raw->sparse gagal: {e}")
+        return False

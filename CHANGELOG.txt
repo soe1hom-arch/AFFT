@@ -12,18 +12,21 @@ v2.0.1 (2026-06-09)
 
 [+] Fitur Baru:
     - Dukungan partisi boot diperluas: recovery.img, dtbo.img, vbmeta.img,
-      vbmeta_vendor.img, vbmeta_system.img, vendor_kernel_boot.img
+      vbmeta_vendor.img, vbmeta_system.img, vendor_kernel_boot.img (total 6 tipe)
     - Menu boot dirombak jadi 3 kategori dengan sub-menu repack spesifik:
       [2] boot/recovery/dtbo | [3] vendor_boot/init_boot | [4] vbmeta/vendor_kernel_boot
     - Fungsi baru: unpack_dtbo(), unpack_recovery(), unpack_vbmeta(),
       repack_dtbo(), repack_recovery(), repack_vbmeta()
+    - raw_to_sparse(): Konversi raw -> sparse otomatis setelah filesystem repack
+      (EROFS & ext4 via mkfs.ext4), make_ext4fs -s sudah sparse bawaan
 
 [*] Peningkatan:
     - Super repack output: super_repack.img (bukan super.img)
-    - Filesystem repack output: *_repack.img
+    - Filesystem repack output: *_repack.img (dengan sparse)
     - Boot repack sudah pakai _repack.img (sebelumnya)
     - Candidate functions disesuaikan dengan menu baru
     - boot_family_status() scan input/ dan temp/img/
+    - Semua dokumentasi diperbarui: README, CHANGELOG
 
 v2.0 (2026-06-08)
 -----------------

@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 from .common import OperationResult, TEMP_DIR, resolve_binary, safe_mkdir
-from .validate import is_sparse_image, detect_fs_type
+from .validate import is_sparse_image, detect_fs_type, raw_to_sparse
 
 
 FILESYSTEM_OUTPUT_DIR = TEMP_DIR / "contents"
@@ -308,6 +308,19 @@ def repack_filesystem(work_dir: Path, output_img: Path | None = None) -> Operati
                 message=f"Proses selesai tapi {output_img.name} tidak ditemukan.",
                 output_path=str(FILESYSTEM_REPACK_DIR),
             )
+
+        # Konversi raw -> sparse (kecuali make_ext4fs -s yg sudah sparse)
+        if fs_kind == "erofs" or ("mkfs.ext4" in str(mkfs)):
+            print(f"  [INFO] Mengonversi raw -> sparse: {output_img.name}")
+            sparse_path = output_img.with_suffix(".sparse.img")
+            ok = raw_to_sparse(output_img, sparse_path)
+            if ok:
+                # Ganti output_img dengan sparse version
+                output_img.unlink()
+                sparse_path.rename(output_img)
+                print(f"  [INFO] Konversi sparse selesai")
+            else:
+                print(f"  [WARN] Konversi sparse gagal, tetap menggunakan raw")
 
         size_mb = output_img.stat().st_size / (1024**2)
         return OperationResult(
