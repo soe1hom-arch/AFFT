@@ -12,7 +12,7 @@ clear
 cat <<'EOF'
 ╔══════════════════════════════════════════════╗
 ║   Android Firmware Full Toolkit (AFFT)      ║
-║          Termux Installer v2.0              ║
+║          Termux Installer v2.0.1              ║
 ╚══════════════════════════════════════════════╝
 EOF
 
