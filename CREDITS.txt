@@ -48,4 +48,4 @@ Berikut adalah kredit untuk masing-masing binary yang digunakan dalam AFFT:
    - Fungsi: Unpack/repack boot image
 
 ---
-AFFT v2.0 — By. soe1hom-arch / Wandi
+AFFT v2.0.1 — Author. soe1hom-arch / Wandi
