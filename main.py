@@ -1,5 +1,5 @@
 # ============================================================
-# Android Firmware Full Toolkit (AFFT) v2.0
+# Android Firmware Full Toolkit (AFFT) v2.0.1
 # By. soe1hom-arch / Wandi
 # ============================================================
 
@@ -43,14 +43,14 @@ RESET  = "\033[0m"
 # BANNER
 # =========================================================
 
-APP_VERSION = "2.0"
+APP_VERSION = "2.0.1"
 
 
 def show_header():
     """Tampilkan header sederhana untuk submenu."""
     print(f"{GREEN}=============================={RESET}")
-    print(f"{CYAN}   ANDROID FIRMWARE TOOLKIT{RESET}")
-    print(f"{YELLOW}   AFFT v{APP_VERSION} — By. soe1hom-arch / Wandi{RESET}")
+    print(f"{CYAN}   ANDROID FIRMWARE FULL TOOLKIT{RESET}")
+    print(f"{YELLOW}   AFFT v{APP_VERSION} — Author. soe1hom-arch / Wandi{RESET}")
     print(f"{GREEN}=============================={RESET}")
 
 
