@@ -58,9 +58,9 @@ def show_banner():
     """Tampilkan banner utama (hanya di menu utama)."""
     print(f"""
 {GREEN}╔══════════════════════════════════════════════╗
-║        {CYAN}ANDROID FIRMWARE TOOLKIT{RESET}{GREEN}           ║
-║        {CYAN}AFFT v{APP_VERSION}{RESET}{GREEN}                       ║
-║        {YELLOW}By. soe1hom-arch / Wandi{RESET}{GREEN}         ║
+║      {CYAN}ANDROID FIRMWARE FULL TOOLKIT{RESET}{GREEN}           ║
+║      {CYAN}AFFT v{APP_VERSION}{RESET}{GREEN}                       ║
+║      {YELLOW}Author .soe1hom-arch/ Wandi{RESET}{GREEN}         ║
 ╚══════════════════════════════════════════════╝{RESET}
 """)
 
