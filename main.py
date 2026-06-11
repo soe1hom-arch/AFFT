@@ -1,6 +1,6 @@
 # ============================================================
 # Android Firmware Full Toolkit (AFFT) v2.0.1
-# By. soe1hom-arch / Wandi
+# Author. soe1hom-arch / Wandi
 # ============================================================
 
 import os
