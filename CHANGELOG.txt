@@ -65,9 +65,12 @@ v2.0 (2026-06-08)
 v1.0 (2025-05-25)
 -----------------
 
-[+] Rilis awal
+[+] Fitur Baru v1.0:
     - Extract payload.bin
     - Unpack super.img
     - Extract filesystem EROFS / ext4
     - Boot family (unpack/repack)
     - Clean output
+
+[+] Rilis awal
+    - Extract Payload.bin
