@@ -1,7 +1,7 @@
 # Android Firmware Full Toolkit (AFFT)
 
 **Versi 2.0.1**  
-*By. soe1hom-arch / Wandi*
+*Author. soe1hom-arch / Wandi*
 
 Android Firmware Full Toolkit (AFFT) adalah alat lengkap untuk memodifikasi firmware Android. Mendukung bongkar-pasang `payload.bin`, `super.img`, filesystem (EROFS/ext4), dan boot image.
 
