@@ -18,13 +18,16 @@ from modules.boot import (
     repack_dtbo,
     repack_recovery,
     repack_vbmeta,
+    repack_vendor_kernel_boot,
     unpack_boot,
     unpack_init_boot,
     unpack_vendor_boot,
     unpack_dtbo,
     unpack_recovery,
     unpack_vbmeta,
+    unpack_vendor_kernel_boot,
 )
+import modules.common as _common
 from modules.common import INPUT_DIR, TEMP_DIR, ensure_workspace, resolve_binary
 from modules.super import repack_super, unpack_super, unpack_super_with_contents
 
@@ -64,6 +67,210 @@ def show_banner():
 ╚══════════════════════════════════════════════╝{RESET}
 """)
 
+
+
+
+def menu_wizard():
+    """Wizard: auto-detect files & folders, ask user what to do."""
+    from modules.filesystem import unpack_filesystem, repack_filesystem
+    from modules.common import safe_mkdir
+    from pathlib import Path
+    import shutil
+    
+    show_header()
+    
+    # Scan locations
+    scan_locations = [
+        ("input/", INPUT_DIR),
+        ("temp/img/", TEMP_DIR / "img"),
+        ("temp/payload/", TEMP_DIR / "payload"),
+        ("temp/contents/", TEMP_DIR / "contents"),
+    ]
+    
+    print(f"{CYAN}Scanning for .img files and contents...{RESET}")
+    
+    all_imgs = []
+    all_contents = []
+    
+    for label, path in scan_locations:
+        if path.exists():
+            for f in sorted(path.iterdir()):
+                if f.is_file() and f.suffix.lower() == '.img' and f.name not in ('super.img', 'super_raw.img'):
+                    all_imgs.append((label, f))
+                if f.is_dir() and label == 'temp/contents/':
+                    all_contents.append((label, f))
+    
+    print(f"\n{GREEN}[i] Found {len(all_imgs)} .img files{RESET}")
+    print(f"{GREEN}[i] Found {len(all_contents)} content directories{RESET}")
+    
+    if _common.DEBUG:
+        print(f"\n{YELLOW}[DEBUG] .img files:{RESET}")
+        for label, f in all_imgs:
+            print(f"  {label}{f.name}")
+        print(f"{YELLOW}[DEBUG] Content dirs:{RESET}")
+        for label, d in all_contents:
+            print(f"  {label}{d.name}")
+    
+    print(f"""
+{CYAN}[1]{RESET} Unpack .img files to filesystem contents
+{CYAN}[2]{RESET} Repack content directories to .img files
+{CYAN}[3]{RESET} Choose custom folder
+{CYAN}[4]{RESET} Back
+""")
+    
+    choice = input("Select : ").strip()
+    
+    if choice == "1":
+        if not all_imgs:
+            print(f"{RED}[X] No .img files found!{RESET}")
+            input(f"{YELLOW}Press Enter...{RESET}")
+            return
+        
+        print(f"{CYAN}Choose source:{RESET}")
+        unique_sources = list(dict.fromkeys([label for label, _ in all_imgs]))
+        for i, src in enumerate(unique_sources, 1):
+            count = sum(1 for l, _ in all_imgs if l == src)
+            print(f"  [{i}] {src} ({count} files)")
+        print(f"  [{len(unique_sources)+1}] All sources")
+        
+        src_choice = input("\nSelect source : ").strip()
+        
+        if src_choice.isdigit():
+            idx = int(src_choice) - 1
+            if idx < len(unique_sources):
+                selected_label = unique_sources[idx]
+                selected_imgs = [f for l, f in all_imgs if l == selected_label]
+            elif idx == len(unique_sources):
+                selected_imgs = [f for _, f in all_imgs]
+            else:
+                print(f"{RED}[X] Invalid{RESET}")
+                return
+        else:
+            return
+        
+        dest = TEMP_DIR / "contents"
+        print(f"\n{YELLOW}Output: {dest}/{RESET}")
+        ok = fail = 0
+        for img in selected_imgs:
+            r = unpack_filesystem(img, output_base=dest)
+            if r.ok:
+                ok += 1
+                print(f"  {GREEN}[V] {img.name}{RESET}")
+            else:
+                fail += 1
+                print(f"  {RED}[X] {img.name}: {r.message}{RESET}")
+        print(f"\n{GREEN}Done: {ok} success, {fail} failed{RESET}")
+        input(f"{YELLOW}Press Enter...{RESET}")
+    
+    elif choice == "2":
+        if not all_contents:
+            print(f"{RED}[X] No content directories found!{RESET}")
+            input(f"{YELLOW}Press Enter...{RESET}")
+            return
+        
+        print(f"\n{CYAN}Content directories available:{RESET}")
+        for i, (_, d) in enumerate(all_contents, 1):
+            print(f"  [{i}] {d.name}")
+        print(f"  [A] All")
+        print(f"  [C] Choose custom folder")
+        
+        sel = input("\nSelect : ").strip()
+        
+        if sel.lower() == 'a':
+            selected = [d for _, d in all_contents]
+        elif sel.lower() == 'c':
+            custom = input("Enter folder path: ").strip()
+            p = Path(custom)
+            if p.exists() and p.is_dir():
+                selected = [p]
+            else:
+                print(f"{RED}[X] Invalid path{RESET}")
+                return
+        elif sel.isdigit():
+            idx = int(sel) - 1
+            if 0 <= idx < len(all_contents):
+                selected = [all_contents[idx][1]]
+            else:
+                print(f"{RED}[X] Invalid{RESET}")
+                return
+        else:
+            return
+        
+        out_dir = TEMP_DIR / "img"
+        print(f"\n{YELLOW}Output: {out_dir}/{RESET}")
+        
+        ok = fail = 0
+        for item in selected:
+            img_name = item.name + '.img'
+            output_img = TEMP_DIR / "repacking" / img_name
+            output_img.parent.mkdir(parents=True, exist_ok=True)
+            
+            fs_result = repack_filesystem(item, output_img=output_img)
+            if fs_result.ok:
+                shutil.copy2(output_img, out_dir / img_name)
+                output_img.unlink(missing_ok=True)
+                ok += 1
+                print(f"  {GREEN}[V] {img_name}{RESET}")
+            else:
+                fail += 1
+                print(f"  {RED}[X] {img_name} gagal: {fs_result.message}{RESET}")
+        print(f"\n{GREEN}Done: {ok} success, {fail} failed{RESET}")
+        input(f"{YELLOW}Press Enter...{RESET}")
+    
+    elif choice == "3":
+        custom_path = input("Enter folder path: ").strip()
+        p = Path(custom_path)
+        if not p.exists():
+            print(f"{RED}[X] Path not found{RESET}")
+            return
+        
+        print(f"""
+{CYAN}[1]{RESET} Unpack .img files in this folder
+{CYAN}[2]{RESET} Repack subdirectories to .img
+{CYAN}[3]{RESET} Back
+""")
+        sub = input("Select : ").strip()
+        
+        if sub == "1":
+            imgs = [f for f in p.iterdir() if f.is_file() and f.suffix.lower() == '.img' and f.name not in ('super.img', 'super_raw.img')]
+            if _common.DEBUG:
+                print(f"  [DEBUG] Found {len(imgs)} .img files in {p}")
+            if not imgs:
+                print(f"{RED}[X] No .img files in that folder{RESET}")
+                return
+            dest = TEMP_DIR / "contents"
+            ok = fail = 0
+            for img in imgs:
+                r = unpack_filesystem(img, output_base=dest)
+                if r.ok:
+                    ok += 1
+                else:
+                    fail += 1
+                    print(f"  {RED}[X] {img.name}: {r.message}{RESET}")
+            print(f"\n{GREEN}Done: {ok} success, {fail} failed{RESET}")
+        
+        elif sub == "2":
+            dirs = [d for d in p.iterdir() if d.is_dir()]
+            if not dirs:
+                print(f"{RED}[X] No subdirectories found{RESET}")
+                return
+            out_dir = TEMP_DIR / "img"
+            ok = fail = 0
+            for item in dirs:
+                img_name = item.name + '.img'
+                output_img = TEMP_DIR / "repacking" / img_name
+                output_img.parent.mkdir(parents=True, exist_ok=True)
+                fs_result = repack_filesystem(item, output_img=output_img)
+                if fs_result.ok:
+                    shutil.copy2(output_img, out_dir / img_name)
+                    output_img.unlink(missing_ok=True)
+                    ok += 1
+                else:
+                    fail += 1
+                    print(f"  {RED}[X] {img_name}: {fs_result.message}{RESET}")
+            print(f"\n{GREEN}Done: {ok} success, {fail} failed{RESET}")
+        
+        input(f"{YELLOW}Press Enter...{RESET}")
 
 # =========================================================
 # PREPARE WORKSPACE & BINARIES
@@ -241,6 +448,8 @@ def menu_payload():
         return
 
     print(f"\n{GREEN}[✓] payload.bin detected{RESET}")
+    if _common.DEBUG:
+        print(f"  [DEBUG] Extracting payload.bin to {TEMP_DIR / 'payload'}")
     process = subprocess.Popen(
         [str(tool), "-o", str(TEMP_DIR / "payload"), str(payload_file)],
         stdout=subprocess.DEVNULL,
@@ -254,6 +463,8 @@ def menu_payload():
     img_dir.mkdir(parents=True, exist_ok=True)
     img_count = 0
     for f in payload_dir.iterdir():
+        if _common.DEBUG:
+            print(f"  [DEBUG] payload file: {f.name} (img={f.suffix.lower() == '.img'})")
         if f.is_file() and f.suffix.lower() == ".img":
             target = img_dir / f.name
             if not target.exists():
@@ -365,12 +576,31 @@ def menu_super():
             from modules.filesystem import repack_filesystem
 
             ok_count = 0
+            NON_FS_PARTS = {
+                "abl", "aop", "aop_config", "bluetooth", "boot", "countrycode",
+                "cpucp", "cpucp_dtb", "devcfg", "dsp", "dtbo", "featenabler",
+                "hyp", "idmanager", "imagefv", "init_boot", "keymaster", "modem",
+                "modemfirmware", "multiimgqti", "soccp_debug", "spuservice",
+                "tz", "uefi", "uefisecapp", "vbmeta", "vm-bootsys", "xbl",
+                "xbl_config", "xbl_ramdump", "vbmeta_system", "vbmeta_vendor",
+                "vendor_boot", "vendor_kernel_boot", "recovery",
+                "qupfw", "shrm", "slim_audiop", "storage", "xm_edid", "pvmfw", "soccp_dcd",
+            }
+
+
             for item in sorted(filesystem_dir.iterdir()):
                 if not item.is_dir():
                     continue
                 img_name = item.name + ".img"
+                if _common.DEBUG:
+                    print(f"  [DEBUG] Processing: {item.name} -> {img_name}")
+                    print(f"  [DEBUG]   src_img={super_img_dir / img_name}, exists={(super_img_dir / img_name).exists()}")
                 src_img = super_img_dir / img_name
                 if not src_img.exists():
+                    continue
+
+                # Skip known non-filesystem partitions (firmware/bootloader)
+                if item.name.lower() in NON_FS_PARTS:
                     continue
 
                 temp_img = TEMP_DIR / "repacking" / img_name
@@ -629,7 +859,7 @@ def menu_boot():
             if image:
                 name_lower = image.name.lower()
                 if name_lower == "vendor_kernel_boot.img":
-                    fn = lambda: unpack_init_boot(image)
+                    fn = lambda: unpack_vendor_kernel_boot(image)
                     label = "vendor_kernel_boot.img"
                 else:
                     fn = lambda: unpack_vbmeta(image)
@@ -665,7 +895,7 @@ def menu_boot():
             if sub == "1":
                 result = run_with_progress("Repacking vendor_boot.img...", repack_vendor_boot)
             elif sub == "2":
-                result = run_with_progress("Repacking init_boot.img...", repack_init_boot)
+                result = run_with_progress("Repacking vendor_kernel_boot.img...", repack_vendor_kernel_boot)
             else:
                 continue
             print_result(result)
@@ -680,7 +910,7 @@ def menu_boot():
             if sub == "1":
                 result = run_with_progress("Repacking vbmeta.img...", repack_vbmeta)
             elif sub == "2":
-                result = run_with_progress("Repacking init_boot.img...", repack_init_boot)
+                result = run_with_progress("Repacking vendor_kernel_boot.img...", repack_vendor_kernel_boot)
             else:
                 continue
             print_result(result)
@@ -699,20 +929,60 @@ def menu_boot():
 
 def menu_clean():
     show_header()
-    for folder in [TEMP_DIR]:
-        if folder.exists():
-            for item in folder.iterdir():
+    
+    # Scan subfolder di TEMP_DIR
+    folders = []
+    if TEMP_DIR.exists():
+        for item in sorted(TEMP_DIR.iterdir()):
+            if item.is_dir():
+                size = sum(f.stat().st_size for f in item.rglob('*') if f.is_file())
+                size_mb = size / (1024**2)
+                folders.append((item.name, item, size_mb))
+    
+    if not folders:
+        print(f"\n{GREEN}[i] Tidak ada folder untuk dibersihkan.{RESET}")
+        input(f"{YELLOW}Press Enter to continue...{RESET}")
+        return
+    
+    print(f"\n{CYAN}Pilih folder yang ingin dibersihkan:{RESET}\n")
+    for i, (name, path, size_mb) in enumerate(folders, 1):
+        print(f"  [{i}] {name}/  ({size_mb:.1f} MB)")
+    print(f"  [A] Bersihkan SEMUA")
+    print(f"  [0] Batal")
+    
+    choice = input("\nSelect : ").strip()
+    
+    if choice.lower() == 'a':
+        count = 0
+        for name, path, _ in folders:
+            try:
+                shutil.rmtree(path)
+                count += 1
+            except Exception:
+                pass
+        for f in TEMP_DIR.iterdir():
+            if f.is_file():
                 try:
-                    if item.is_file():
-                        item.unlink()
-                    else:
-                        shutil.rmtree(item)
+                    f.unlink()
                 except Exception:
                     pass
-    print(f"\n{GREEN}[✓] Output cleaned{RESET}")
-    input(f"\n{YELLOW}Press Enter to continue...{RESET}")
-
-
+        print(f"\n{GREEN}[✓] {count} folder dibersihkan{RESET}")
+    
+    elif choice.isdigit():
+        idx = int(choice) - 1
+        if 0 <= idx < len(folders):
+            name, path, size_mb = folders[idx]
+            try:
+                shutil.rmtree(path)
+                print(f"\n{GREEN}[✓] {name}/ dibersihkan{RESET}")
+            except Exception as e:
+                print(f"\n{RED}[✗] Gagal membersihkan {name}/: {e}{RESET}")
+        else:
+            print(f"\n{YELLOW}[i] Dibatalkan{RESET}")
+    else:
+        print(f"\n{YELLOW}[i] Dibatalkan{RESET}")
+    
+    input(f"{YELLOW}Press Enter...{RESET}")
 # =========================================================
 # MAIN LOOP
 # =========================================================
@@ -725,6 +995,8 @@ while True:
 {CYAN}[3]{RESET} Extract filesystem IMG
 {CYAN}[4]{RESET} Boot family (unpack/repack)
 {CYAN}[5]{RESET} Clean output
+{CYAN}[W]{RESET} Wizard mode - auto scan & choose action
+{CYAN}[D]{RESET} Toggle debug mode (current: {'ON' if _common.DEBUG else 'OFF'})
 {CYAN}[6]{RESET} Exit
 """)
 
@@ -740,6 +1012,14 @@ while True:
         menu_boot()
     elif choice == "5":
         menu_clean()
+    elif choice.lower() == "w":
+        menu_wizard()
+    elif choice.lower() == "d":
+        import modules.common as _common
+        _common.DEBUG = not _common.DEBUG
+        status = "ON" if _common.DEBUG else "OFF"
+        print(f"{GREEN}[V] Debug mode: {status}{RESET}")
+        input(f"{YELLOW}Press Enter...{RESET}")
     elif choice == "6":
         print(f"\n{CYAN}Thank you for using this tool!{RESET}")
         break

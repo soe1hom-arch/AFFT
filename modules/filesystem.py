@@ -9,6 +9,7 @@ import shutil
 import subprocess
 
 from .common import OperationResult, TEMP_DIR, resolve_binary, safe_mkdir
+from . import common
 from .validate import is_sparse_image, detect_fs_type, raw_to_sparse
 
 
@@ -57,7 +58,7 @@ def _format_proc_error(exc: subprocess.CalledProcessError) -> str:
 
 
 def unpack_filesystem(image_path: Path, output_base: Path | None = None) -> OperationResult:
-    out_dir = safe_mkdir((output_base or FILESYSTEM_OUTPUT_DIR) / image_path.stem)
+    out_dir = (output_base or FILESYSTEM_OUTPUT_DIR) / image_path.stem
 
     erofs = _extract_erofs()
     debugfs = _debugfs()
@@ -77,7 +78,29 @@ def unpack_filesystem(image_path: Path, output_base: Path | None = None) -> Oper
             output_path=str(out_dir),
         )
 
+    # Skip known non-filesystem partitions (firmware/bootloader)
+    NON_FS_PARTS = {
+        "abl", "aop", "aop_config", "bluetooth", "boot", "countrycode",
+        "cpucp", "cpucp_dtb", "devcfg", "dsp", "dtbo", "featenabler",
+        "hyp", "idmanager", "imagefv", "init_boot", "keymaster", "modem",
+        "modemfirmware", "multiimgqti", "soccp_debug", "spuservice",
+        "tz", "uefi", "uefisecapp", "vbmeta", "vm-bootsys", "xbl",
+        "xbl_config", "xbl_ramdump", "vbmeta_system", "vbmeta_vendor",
+        "vendor_boot", "vendor_kernel_boot", "recovery",
+        "qupfw", "shrm", "slim_audiop", "storage", "xm_edid", "pvmfw", "soccp_dcd",
+    }
+    name_stem = image_path.stem.lower()
+    if name_stem in NON_FS_PARTS:
+        return OperationResult(
+            ok=False,
+            title=f"Unpack {image_path.name}",
+            message="Bukan filesystem image (firmware/boot partition), dilewati.",
+            output_path=str(out_dir),
+        )
+    
     try:
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
         source_img = image_path
 
@@ -120,6 +143,8 @@ def unpack_filesystem(image_path: Path, output_base: Path | None = None) -> Oper
             fs_kind = "erofs" if any(k in name for k in erofs_keywords) else "ext4"
             print(f"  [WARN] Magic bytes tidak dikenal, tebak dari nama: {fs_kind}")
 
+        if DEBUG:
+            print(f"  [DEBUG] Filesystem: {image_path.name} -> {fs_kind} (detected)")
         print(f"  [INFO] Filesystem terdeteksi: {fs_kind} untuk {image_path.name}")
 
         if fs_kind == "erofs":
@@ -137,7 +162,7 @@ def unpack_filesystem(image_path: Path, output_base: Path | None = None) -> Oper
                 [str(debugfs), "-R", f"rdump / {ext4_root}", str(source_img)],
                 cwd=str(out_dir),
                 check=False,
-                capture_output=True,
+                    capture_output=True,
                 text=True,
             )
 
@@ -156,6 +181,8 @@ def unpack_filesystem(image_path: Path, output_base: Path | None = None) -> Oper
         )
 
     except subprocess.CalledProcessError as exc:
+        if out_dir.exists():
+            shutil.rmtree(out_dir, ignore_errors=True)
         return OperationResult(
             ok=False,
             title=f"Unpack {image_path.name}",
@@ -163,6 +190,8 @@ def unpack_filesystem(image_path: Path, output_base: Path | None = None) -> Oper
             output_path=str(out_dir),
         )
     except Exception as exc:
+        if out_dir.exists():
+            shutil.rmtree(out_dir, ignore_errors=True)
         return OperationResult(
             ok=False,
             title=f"Unpack {image_path.name}",
@@ -195,6 +224,25 @@ def repack_filesystem(work_dir: Path, output_img: Path | None = None) -> Operati
     if output_img is None:
         output_img = FILESYSTEM_REPACK_DIR / f"{work_dir.name}.img"
     output_img.parent.mkdir(parents=True, exist_ok=True)
+    # Skip known non-filesystem partitions (firmware/bootloader)
+    NON_FS_PARTITIONS = {
+        "abl", "aop", "aop_config", "bluetooth", "boot", "countrycode",
+        "cpucp", "cpucp_dtb", "devcfg", "dsp", "dtbo", "featenabler",
+        "hyp", "idmanager", "imagefv", "init_boot", "keymaster", "modem",
+        "modemfirmware", "multiimgqti", "soccp_debug", "spuservice",
+        "tz", "uefi", "uefisecapp", "vbmeta", "vm-bootsys", "xbl",
+        "xbl_config", "xbl_ramdump", "vbmeta_system", "vbmeta_vendor",
+        "vendor_boot", "vendor_kernel_boot", "recovery", "dtbo",
+        "qupfw", "shrm", "slim_audiop", "storage", "xm_edid", "pvmfw", "soccp_dcd", "multiimgqti",
+    }
+    
+    if work_dir.name.lower() in NON_FS_PARTITIONS:
+        return OperationResult(
+            ok=False,
+            title=f"Repack {work_dir.name}",
+            message="Bukan filesystem image (firmware/boot partition), dilewati.",
+            output_path=str(FILESYSTEM_REPACK_DIR),
+        )
 
     def _get_termux_env() -> dict:
         """Dapatkan environment dengan LD_LIBRARY_PATH untuk binary Termux.
@@ -225,6 +273,8 @@ def repack_filesystem(work_dir: Path, output_img: Path | None = None) -> Operati
     # Cari referensi image untuk deteksi tipe filesystem
     ref_img = _find_ref_image(work_dir.name)
     fs_kind = "unknown"
+    if DEBUG:
+        print(f"  [DEBUG] Repack: {work_dir.name}, ref_img={ref_img}")
     if ref_img and ref_img.exists():
         if is_sparse_image(ref_img):
             # Kalau sparse, skip magic detection, fallback ke keyword
@@ -281,6 +331,8 @@ def repack_filesystem(work_dir: Path, output_img: Path | None = None) -> Operati
                 )
 
             ref_size = 0
+            if common.DEBUG:
+                print(f"  [DEBUG] Repack: {work_dir.name}, ref_img={ref_img}")
             if ref_img and ref_img.exists():
                 ref_size = ref_img.stat().st_size
             if ref_size == 0:
@@ -293,6 +345,8 @@ def repack_filesystem(work_dir: Path, output_img: Path | None = None) -> Operati
             else:
                 cmd = [str(mkfs), "-F", str(ref_size), str(output_img), str(work_dir)]
 
+        if DEBUG:
+            print(f"  [DEBUG] Running: {' '.join(str(x) for x in cmd)}")
         proc = subprocess.run(cmd, check=False, capture_output=True, text=True,
                               env=_termux_env if _needs_termux_env else None)
         if proc.returncode != 0:

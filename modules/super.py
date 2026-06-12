@@ -9,6 +9,7 @@ import shutil
 import subprocess
 
 from .common import OperationResult, TEMP_DIR, resolve_binary, safe_mkdir
+from . import common
 from .filesystem import unpack_filesystem
 from .validate import is_sparse_image
 
@@ -134,6 +135,8 @@ def unpack_super(image_path: Path) -> OperationResult:
         else:
             print(f"  [INFO] Bukan sparse image, langsung unpack...")
 
+        if common.DEBUG:
+            print(f"  [DEBUG] lpunpack {raw_img.name} -> {work_dir}")
         print(f"  [INFO] Menjalankan lpunpack pada {raw_img.name}...")
         unpack = subprocess.run(
             [str(lpunpack), str(raw_img), str(work_dir)],

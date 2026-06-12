@@ -8,6 +8,9 @@ import shutil
 import subprocess
 import stat
 from dataclasses import dataclass
+
+# Debug mode (toggled from main menu)
+DEBUG = False
 from pathlib import Path
 
 

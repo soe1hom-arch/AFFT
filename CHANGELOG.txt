@@ -1,6 +1,37 @@
 CHANGELOG - Android Firmware Full Toolkit (AFFT)
 ===========================================
 
+v2.0.2 (2026-06-12)
+-------------------
+
+[!] Perbaikan Bug:
+    - Fix raw_to_sparse struct.pack format mismatch: "<IHHIIIII" (8 spec, 9 args)
+      diganti "<IHHHHIIII" (9 spec, 9 args) agar konversi sparse tidak error
+    - Fix raw_to_sparse uint32 overflow untuk image >4GB:
+      Sekarang support multi-chunk RAW (split jadi beberapa chunk) untuk image
+      besar seperti product.img (4.8GB), bukan cuma fallback ke raw
+    - Fix stray "continue" tanpa kondisi di main.py repack loop:
+      Semua direktori ke-skip karena continue doang → repack selalu "Semua gagal"
+    - Fix "Semua filesystem gagal direpack" karena direktori ext4 hanya berisi
+      subfolder "ext4_extract/" (file tidak langsung di root folder)
+    - Fix SIGSYS crash untuk partisi firmware: 42 partisi non-filesystem
+      (abl, aop, modem, tz, xbl, dll) sekarang di-skip dengan pesan jelas
+
+[+] Fitur Baru:
+    - Wizard mode [W]: Auto-scan folder untuk .img & content directories,
+      lalu kasih pilihan unpack/repack dengan path kustom
+    - Debug mode [D]: Toggle global, semua module tampilkan info detail
+      (filesystem detected, mkfs command, lpunpack params, dll)
+    - Perbaikan file detection: unpack_filesystem & repack_filesystem
+      otomatis skip 42 partisi firmware yang bukan filesystem
+
+[*] Peningkatan:
+    - Output konsisten: unpack_filesystem bersihkan dulu folder sebelum
+      ekstrak (if out_dir.exists(): shutil.rmtree(out_dir))
+    - Error handling: semua exception cleanup dengan rmtree (full & partial)
+    - DEBUG flag pindah ke modules/common.py supaya bisa diakses semua module
+    - Menu display debug status pakai module reference (bukan local copy)
+
 v2.0.1 (2026-06-09)
 -------------------
 
@@ -9,68 +40,3 @@ v2.0.1 (2026-06-09)
       - magiskboot return code 3 khusus untuk vendor_boot, sekarang dianggap sukses
     - Fix boot unpack: file sumber tidak lagi dihapus setelah unpack (diperlukan untuk repack)
     - Fix repack boot gagal karena source image tidak ditemukan di work_dir
-
-[+] Fitur Baru:
-    - Dukungan partisi boot diperluas: recovery.img, dtbo.img, vbmeta.img,
-      vbmeta_vendor.img, vbmeta_system.img, vendor_kernel_boot.img (total 6 tipe)
-    - Menu boot dirombak jadi 3 kategori dengan sub-menu repack spesifik:
-      [2] boot/recovery/dtbo | [3] vendor_boot/init_boot | [4] vbmeta/vendor_kernel_boot
-    - Fungsi baru: unpack_dtbo(), unpack_recovery(), unpack_vbmeta(),
-      repack_dtbo(), repack_recovery(), repack_vbmeta()
-    - raw_to_sparse(): Konversi raw -> sparse otomatis setelah filesystem repack
-      (EROFS & ext4 via mkfs.ext4), make_ext4fs -s sudah sparse bawaan
-
-[*] Peningkatan:
-    - Super repack output: super_repack.img (bukan super.img)
-    - Filesystem repack output: *_repack.img (dengan sparse)
-    - Boot repack sudah pakai _repack.img (sebelumnya)
-    - Candidate functions disesuaikan dengan menu baru
-    - boot_family_status() scan input/ dan temp/img/
-    - Semua dokumentasi diperbarui: README, CHANGELOG
-
-v2.0 (2026-06-08)
------------------
-
-[+] Fitur Baru v2.0:
-    - Menu repack super.img (Submenu [2] → [3] dan [4])
-    - Menu repack filesystem satu per satu (Submenu [3] → [2])
-    - Filesystem extraction & repack mandiri tanpa super.img
-    - Modular code dengan modules/ (super.py, filesystem.py, boot.py, validate.py)
-    - Boot family (unpack/repack boot.img, vendor_boot.img, init_boot.img)
-    - Batch mode: Extract/Repack ALL filesystem sekaligus
-    - Unified storage: Semua hasil operasi tersimpan di temp/ (img/, contents/, repacked/)
-    - Sparse auto-conversion di filesystem unpack (simg2img otomatis)
-    - Skip partisi 0-byte (slot B kosong otomatis dilewati)
-    - Keyword EROFS diperluas (24 keyword: my_product, oplus_*, dll)
-    - Payload.bin hasil extract otomatis dicopy ke temp/img/
-    - Menu [3] → [1] Extract FS: cari .img dari input/ DAN temp/img/
-    - Banner utama di menu, header sederhana di submenu
-
-[!] Perbaikan Bug:
-    - Fix "work_dir not defined" pada unpack_super_with_contents
-    - Fix misleading error message "temp/super/" jadi "temp/img/"
-    - Fix UnboundLocalError: fs_kind dipakai sebelum diisi
-    - Fix SIGSYS pada simg2img/mkfs.erofs (ganti ke NDK build)
-    - Fix libuuid.so not found (LD_LIBRARY_PATH otomatis)
-    - Output tidak lagi terduplikasi (semua di temp/, tanpa output/)
-
-[*] Peningkatan:
-    - Binary mkfs.erofs & extract.erofs: Android NDK static build (kompatibel 100%)
-    - Storage lebih hemat: tidak ada duplikasi output/ + temp/
-    - Filter super.img & super_raw.img tidak ikut extract
-    - Binary opsional tidak wajib (mkfs.erofs, make_ext4fs, lpmake)
-    - Binary resolver otomatis: PATH > $HOME/ > bin/ lokal
-    - Format lpmake diperbaiki: --partition= dan --image= (fork custom)
-
-v1.0 (2025-05-25)
------------------
-
-[+] Fitur Baru v1.0:
-    - Extract payload.bin
-    - Unpack super.img
-    - Extract filesystem EROFS / ext4
-    - Boot family (unpack/repack)
-    - Clean output
-
-[+] Rilis awal
-    - Extract Payload.bin

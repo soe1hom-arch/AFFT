@@ -249,6 +249,10 @@ def unpack_vbmeta(image_path: Path) -> OperationResult:
     return _unpack_boot_common(image_path, BOOT_WORK_DIR / "vbmeta")
 
 
+def unpack_vendor_kernel_boot(image_path: Path) -> OperationResult:
+    return _unpack_boot_common(image_path, BOOT_WORK_DIR / "vendor_kernel_boot")
+
+
 def repack_boot():
     return _repack_boot_common("boot.img", BOOT_WORK_DIR / "boot")
 
@@ -271,3 +275,7 @@ def repack_recovery():
 
 def repack_vbmeta():
     return _repack_boot_common("vbmeta.img", BOOT_WORK_DIR / "vbmeta")
+
+
+def repack_vendor_kernel_boot():
+    return _repack_boot_common("vendor_kernel_boot.img", BOOT_WORK_DIR / "vendor_kernel_boot")
