@@ -1,0 +1,59 @@
+CHANGELOG - Android Firmware Full Toolkit (AFFT)
+===========================================
+
+### v2.0.3 (2026-06-23)
+
+[+] Fitur Baru:
+- **lucky-arch integration** — unpack super.img sekarang bisa menggunakan lucky-arch (satu binary, tanpa intermediate raw file di disk)
+- **Hemat storage** — lucky-arch unpack super.img langsung tanpa konversi sparse→raw dulu
+
+[*] Peningkatan:
+- **super.py** — otomatis deteksi lucky-arch; fallback ke simg2img + lpunpack jika tidak ada
+- **filesystem.py** — extract filesystem juga bisa pakai `lucky-arch --to-raw` untuk konversi sparse, fallback ke simg2img
+- **validate.py** — hapus duplicate function definitions; multi-chunk raw_to_sparse sekarang benar-benar aktif
+- **Binary requirements** — lpunpack & simg2img jadi opsional jika lucky-arch tersedia
+
+[!] Perbaikan Bug:
+- Fix duplicate fungsi di validate.py (required_binaries_present, is_sparse_image, detect_fs_type, raw_to_sparse)
+- raw_to_sparse multi-chunk untuk image >4GB sekarang benar-benar digunakan (sebelumnya tertimpa definisi lama)
+
+
+v2.0.2 (2026-06-12)
+-------------------
+
+[!] Perbaikan Bug:
+    - Fix raw_to_sparse struct.pack format mismatch: "<IHHIIIII" (8 spec, 9 args)
+      diganti "<IHHHHIIII" (9 spec, 9 args) agar konversi sparse tidak error
+    - Fix raw_to_sparse uint32 overflow untuk image >4GB:
+      Sekarang support multi-chunk RAW (split jadi beberapa chunk) untuk image
+      besar seperti product.img (4.8GB), bukan cuma fallback ke raw
+    - Fix stray "continue" tanpa kondisi di main.py repack loop:
+      Semua direktori ke-skip karena continue doang → repack selalu "Semua gagal"
+    - Fix "Semua filesystem gagal direpack" karena direktori ext4 hanya berisi
+      subfolder "ext4_extract/" (file tidak langsung di root folder)
+    - Fix SIGSYS crash untuk partisi firmware: 42 partisi non-filesystem
+      (abl, aop, modem, tz, xbl, dll) sekarang di-skip dengan pesan jelas
+
+[+] Fitur Baru:
+    - Wizard mode [W]: Auto-scan folder untuk .img & content directories,
+      lalu kasih pilihan unpack/repack dengan path kustom
+    - Debug mode [D]: Toggle global, semua module tampilkan info detail
+      (filesystem detected, mkfs command, lpunpack params, dll)
+    - Perbaikan file detection: unpack_filesystem & repack_filesystem
+      otomatis skip 42 partisi firmware yang bukan filesystem
+
+[*] Peningkatan:
+    - Output konsisten: unpack_filesystem bersihkan dulu folder sebelum
+      ekstrak (if out_dir.exists(): shutil.rmtree(out_dir))
+    - Error handling: semua exception cleanup dengan rmtree (full & partial)
+    - DEBUG flag pindah ke modules/common.py supaya bisa diakses semua module
+    - Menu display debug status pakai module reference (bukan local copy)
+
+v2.0.1 (2026-06-09)
+-------------------
+
+[!] Perbaikan Bug:
+    - Fix vendor_boot.img unpack gagal (exit code 3 = vendor_boot detected, BUKAN error)
+      - magiskboot return code 3 khusus untuk vendor_boot, sekarang dianggap sukses
+    - Fix boot unpack: file sumber tidak lagi dihapus setelah unpack (diperlukan untuk repack)
+    - Fix repack boot gagal karena source image tidak ditemukan di work_dir

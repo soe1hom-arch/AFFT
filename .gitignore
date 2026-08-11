@@ -1,0 +1,12 @@
+input/
+output/
+temp/
+logs/
+__pycache__/
+*.pyc
+.DS_Store
+*.log
+*.tmp
+build/
+dist/
+*.spec

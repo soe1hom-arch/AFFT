@@ -1,0 +1,52 @@
+=== KREDIT BINARY TOOLS ===
+
+Berikut adalah kredit untuk masing-masing binary yang digunakan dalam AFFT:
+
+1. payload-dumper-go (9.11 MB)
+   - Kredit: ssut
+   - Sumber: https://github.com/ssut/payload-dumper-go
+   - Fungsi: Extract payload.bin (OTA firmware)
+
+2. lpunpack (873 KB)
+   - Kredit: AOSP (Android Open Source Project)
+   - Sumber: https://android.googlesource.com/platform/system/core/
+   - Fungsi: Unpack super.img (logical partitions)
+
+3. lpmake (973 KB)
+   - Kredit: AOSP (Android Open Source Project)
+   - Sumber: https://android.googlesource.com/platform/system/core/
+   - Fungsi: Repack super.img
+
+4. simg2img (56 KB)
+   - Kredit: AOSP (Android Open Source Project)
+   - Sumber: https://android.googlesource.com/platform/system/core/
+   - Fungsi: Konversi sparse Android image ke raw
+
+5. extract.erofs (1.04 MB)
+   - Kredit: Gao Xiang / erofs-utils (NDK build by sekaiacg)
+   - Sumber: https://github.com/sekaiacg/erofs-utils
+   - Fungsi: Extract filesystem EROFS
+
+6. mkfs.erofs (1.60 MB)
+   - Kredit: Gao Xiang / erofs-utils (NDK build by sekaiacg)
+   - Sumber: https://github.com/sekaiacg/erofs-utils
+   - Fungsi: Membuat filesystem EROFS
+
+7. debugfs (720 KB)
+   - Kredit: Theodore Ts'o / e2fsprogs | Static build: Tsurugi Linux
+   - Sumber: https://git.kernel.org/pub/scm/fs/ext2/e2fsprogs.git/
+   - Fungsi: Extract & debug filesystem ext4
+
+8. make_ext4fs (150 KB)
+   - Kredit: AOSP / rendiix (Android NDK build)
+   - Sumber: https://github.com/rendiix/make_ext4fs
+   - Fungsi: Membuat filesystem ext4 untuk Android
+
+9. magiskboot (770 KB)
+   - Kredit: John Wu (topjohnwu)
+   - Sumber: https://github.com/topjohnwu/Magisk
+   - Fungsi: Unpack/repack boot image
+
+---
+AFFT v2.0.2 — Author. soe1hom-arch / Wandi
+23. lucky-arch (2.4 MB) — by soe1hom-arch (penggabungan simg2img + lpunpack)
